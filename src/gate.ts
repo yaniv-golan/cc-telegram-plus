@@ -1,5 +1,5 @@
-import { realpathSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { realpathSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 import crypto from 'node:crypto'
 import type { Access, GateResult } from './types.ts'
 
@@ -182,12 +182,21 @@ export function assertSendable(filePath: string, stateDir: string): void {
     return
   }
 
-  const inboxDir = resolve(resolvedStateDir, 'inbox')
-
   // Inside stateDir?
   if (resolved.startsWith(resolvedStateDir + '/') || resolved === resolvedStateDir) {
-    // Must be inside inbox
-    if (!resolved.startsWith(inboxDir + '/') && resolved !== inboxDir) {
+    // Must be inside inbox — only do realpathSync check if inbox exists
+    let resolvedInbox: string
+    const inboxPath = join(resolvedStateDir, 'inbox')
+    if (!existsSync(inboxPath)) {
+      // inbox doesn't exist, file can't be in it
+      throw new Error(`File ${filePath} is inside state dir but not in inbox`)
+    }
+    try {
+      resolvedInbox = realpathSync(inboxPath)
+    } catch {
+      throw new Error(`File ${filePath} is inside state dir but not in inbox`)
+    }
+    if (!resolved.startsWith(resolvedInbox + '/') && resolved !== resolvedInbox) {
       throw new Error(`File ${filePath} is inside state dir but not in inbox`)
     }
   }

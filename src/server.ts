@@ -8,7 +8,7 @@ import {
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { Bot } from 'grammy'
-import { createSessionManager } from './sessions.ts'
+import { createSessionManager, startApprovalPoller, stopApprovalPoller } from './sessions.ts'
 import { createCache } from './cache.ts'
 import { createAccessIO } from './access-io.ts'
 import { registerHandlers } from './handlers.ts'
@@ -36,10 +36,6 @@ try {
     const value = trimmed.slice(eqIdx + 1).trim()
     if (key === 'TELEGRAM_BOT_TOKEN') {
       token = value
-    }
-    // Also set into process.env for other potential consumers
-    if (key === 'OPENAI_API_KEY' && !process.env.OPENAI_API_KEY) {
-      process.env.OPENAI_API_KEY = value
     }
   }
 } catch {
@@ -233,12 +229,15 @@ const transcribe = process.env.OPENAI_API_KEY
 
 // ─── 10. Create SessionManager ─────────────────────────────────────────────────
 
+let approvalTimer: NodeJS.Timeout | null = null
 const startPolling = () => {
-  void bot.start({
-    allowed_updates: ['message', 'message_reaction', 'callback_query'],
-  })
+  void bot.start({ allowed_updates: ['message', 'message_reaction', 'callback_query'] })
+  approvalTimer = startApprovalPoller({ stateDir, sendNotification })
 }
-const stopPolling = () => { bot.stop() }
+const stopPolling = () => {
+  bot.stop()
+  if (approvalTimer) { stopApprovalPoller(approvalTimer); approvalTimer = null }
+}
 
 const sendNotification = async (chatId: string, text: string, keyboard?: any) => {
   await bot.api.sendMessage(
@@ -299,6 +298,7 @@ void bot.api.setMyCommands(
     { command: 'sessions', description: 'List active sessions' },
     { command: 'status', description: 'Show current active session' },
     { command: 'chatid', description: 'Show this chat ID' },
+    { command: 'switch', description: 'Switch to another session' },
   ],
   { scope: { type: 'all_private_chats' } },
 )
@@ -306,6 +306,7 @@ void bot.api.setMyCommands(
 void bot.api.setMyCommands(
   [
     { command: 'chatid', description: 'Show this chat ID' },
+    { command: 'sessions', description: 'Show active Claude Code sessions' },
   ],
   { scope: { type: 'all_group_chats' } },
 )
@@ -313,10 +314,10 @@ void bot.api.setMyCommands(
 // ─── 17. Set bot description ───────────────────────────────────────────────────
 
 void bot.api.setMyDescription(
-  'I connect your Telegram chats to Claude Code sessions. Send me a message to get started!',
+  'Enhanced Telegram channel for Claude Code. Supports all media types, voice transcription, session management, and more.',
 )
 void bot.api.setMyShortDescription(
-  'Claude Code Telegram bridge',
+  'Claude Code ↔ Telegram (enhanced)',
 )
 
 // ─── 18. Activate session + start watch ────────────────────────────────────────
@@ -340,3 +341,4 @@ const cleanup = () => {
 }
 process.on('SIGINT', cleanup)
 process.on('SIGTERM', cleanup)
+process.on('beforeExit', cleanup)
