@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, renameSync, unlinkSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, renameSync, unlinkSync, existsSync, readdirSync, mkdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
 import { withLock, isProcessAlive } from './lock.ts'
@@ -28,7 +28,11 @@ function writeState(stateDir: string, state: StateFile): void {
   renameSync(tmpPath, filePath)
 }
 
-function cleanStaleSessions(state: StateFile): { cleaned: boolean; activeRemoved: boolean } {
+function cleanStaleSessions(state: StateFile, opts?: {
+  stateDir: string
+  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][]) => Promise<void>
+  loadAccess: () => Access
+}): { cleaned: boolean; activeRemoved: boolean } {
   let cleaned = false
   let activeRemoved = false
   const toRemove: string[] = []
@@ -43,6 +47,9 @@ function cleanStaleSessions(state: StateFile): { cleaned: boolean; activeRemoved
   for (const id of toRemove) {
     delete state.sessions[id]
     cleaned = true
+    if (opts) {
+      try { unlinkSync(join(opts.stateDir, `cache-${id}.json`)) } catch {}
+    }
   }
 
   if (activeRemoved) {
@@ -51,6 +58,12 @@ function cleanStaleSessions(state: StateFile): { cleaned: boolean; activeRemoved
     if (remaining.length > 0) {
       remaining.sort(([, a], [, b]) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
       remaining[0][1].active = true
+      const newActiveSession = remaining[0][1]
+      if (opts) {
+        for (const userId of opts.loadAccess().allowFrom) {
+          void opts.sendNotification(userId, `Session switched to: ${newActiveSession.label} (previous session ended)`)
+        }
+      }
     }
   }
 
@@ -86,11 +99,20 @@ export function createSessionManager(opts: {
     register(): string {
       sessionId = randomBytes(8).toString('hex')
 
-      lockedOp((state) => {
+      const notifyNewSession = lockedOp((state) => {
         // Clean stale before deciding active status
-        cleanStaleSessions(state)
+        cleanStaleSessions(state, { stateDir, sendNotification, loadAccess })
 
         const isFirst = Object.keys(state.sessions).length === 0
+
+        // Find active session before registering (for notification)
+        let activeSession: Session | null = null
+        if (!isFirst) {
+          for (const session of Object.values(state.sessions)) {
+            if (session.active) { activeSession = session; break }
+          }
+        }
+
         state.sessions[sessionId] = {
           pid: process.pid,
           instanceId: INSTANCE_ID,
@@ -98,7 +120,19 @@ export function createSessionManager(opts: {
           startedAt: new Date().toISOString(),
           active: isFirst,
         }
+
+        return activeSession
       })
+
+      if (notifyNewSession) {
+        const access = loadAccess()
+        for (const userId of access.allowFrom) {
+          void sendNotification(userId,
+            `New session started: ${label}\n\nCurrently active: ${notifyNewSession.label}`,
+            [[{ text: `Switch to ${label}`, callback_data: `switch_${sessionId}` }, { text: 'Keep current', callback_data: 'switch_dismiss' }]]
+          )
+        }
+      }
 
       return sessionId
     },
@@ -135,7 +169,7 @@ export function createSessionManager(opts: {
 
         if (needsCleanup) {
           lockedOp((lockedState) => {
-            cleanStaleSessions(lockedState)
+            cleanStaleSessions(lockedState, { stateDir, sendNotification, loadAccess })
           })
         }
 
@@ -207,7 +241,7 @@ export function createSessionManager(opts: {
 
       if (needsCleanup) {
         lockedOp((lockedState) => {
-          cleanStaleSessions(lockedState)
+          cleanStaleSessions(lockedState, { stateDir, sendNotification, loadAccess })
         })
         return readState(stateDir).sessions
       }
@@ -262,4 +296,64 @@ export function createSessionManager(opts: {
   }
 
   return manager
+}
+
+export function startApprovalPoller(opts: {
+  stateDir: string
+  sendNotification: (chatId: string, text: string) => Promise<void>
+}): NodeJS.Timeout {
+  const approvedDir = join(opts.stateDir, 'approved')
+  try { mkdirSync(approvedDir, { recursive: true }) } catch {}
+
+  const timer = setInterval(async () => {
+    let entries: string[]
+    try {
+      entries = readdirSync(approvedDir)
+    } catch {
+      return
+    }
+
+    for (const entry of entries) {
+      const filePath = join(approvedDir, entry)
+
+      if (entry.endsWith('.claimed')) {
+        // Check for orphaned .claimed files older than 30 seconds
+        try {
+          const stat = statSync(filePath)
+          const age = Date.now() - stat.mtimeMs
+          if (age > 30_000) {
+            const unclaimedName = entry.replace(/\.claimed$/, '')
+            const unclaimedPath = join(approvedDir, unclaimedName)
+            try { renameSync(filePath, unclaimedPath) } catch {}
+          }
+        } catch {}
+        continue
+      }
+
+      // Unclaimed file — try to claim it
+      const claimedPath = filePath + '.claimed'
+      try {
+        renameSync(filePath, claimedPath)
+      } catch {
+        // Another session claimed it first (ENOENT) — skip
+        continue
+      }
+
+      const senderId = entry
+      try {
+        await opts.sendNotification(senderId, 'Your pairing has been approved! You can now send messages.')
+        // Success — delete the claimed file
+        try { unlinkSync(claimedPath) } catch {}
+      } catch {
+        // DM send failed — rename back to unclaimed for retry
+        try { renameSync(claimedPath, filePath) } catch {}
+      }
+    }
+  }, 5000)
+
+  return timer
+}
+
+export function stopApprovalPoller(timer: NodeJS.Timeout): void {
+  clearInterval(timer)
 }

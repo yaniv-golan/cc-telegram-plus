@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, utimesSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { createSessionManager } from '../src/sessions.ts'
+import { createSessionManager, startApprovalPoller, stopApprovalPoller } from '../src/sessions.ts'
 import type { Access, InlineButton } from '../src/types.ts'
 
 function makeTmp(): string {
@@ -283,5 +283,170 @@ describe('stop', () => {
     // it would try to read a removed session. We confirm stop completes cleanly.
     const state = readStateFile(dir)
     expect(state.sessions).toEqual({})
+  })
+})
+
+describe('approval poller', () => {
+  it('processes unclaimed file', async () => {
+    const dir = makeTmp()
+    const approvedDir = join(dir, 'approved')
+    mkdirSync(approvedDir, { recursive: true })
+    writeFileSync(join(approvedDir, '123'), '')
+
+    const notifications: { chatId: string; text: string }[] = []
+    const timer = startApprovalPoller({
+      stateDir: dir,
+      sendNotification: async (chatId, text) => {
+        notifications.push({ chatId, text })
+      },
+    })
+
+    // Wait for poller to run
+    await new Promise(r => setTimeout(r, 6000))
+    stopApprovalPoller(timer)
+
+    expect(notifications.length).toBe(1)
+    expect(notifications[0].chatId).toBe('123')
+    expect(notifications[0].text).toContain('approved')
+    expect(existsSync(join(approvedDir, '123'))).toBe(false)
+    expect(existsSync(join(approvedDir, '123.claimed'))).toBe(false)
+  }, 10000)
+
+  it('skips on send failure and retries', async () => {
+    const dir = makeTmp()
+    const approvedDir = join(dir, 'approved')
+    mkdirSync(approvedDir, { recursive: true })
+    writeFileSync(join(approvedDir, '456'), '')
+
+    let callCount = 0
+    const timer = startApprovalPoller({
+      stateDir: dir,
+      sendNotification: async () => {
+        callCount++
+        throw new Error('DM send failed')
+      },
+    })
+
+    // Wait for poller to run once
+    await new Promise(r => setTimeout(r, 6000))
+    stopApprovalPoller(timer)
+
+    // File should be renamed back to unclaimed for retry
+    expect(existsSync(join(approvedDir, '456'))).toBe(true)
+    expect(existsSync(join(approvedDir, '456.claimed'))).toBe(false)
+    expect(callCount).toBeGreaterThanOrEqual(1)
+  }, 10000)
+
+  it('recovers orphaned .claimed file', async () => {
+    const dir = makeTmp()
+    const approvedDir = join(dir, 'approved')
+    mkdirSync(approvedDir, { recursive: true })
+
+    const claimedPath = join(approvedDir, '789.claimed')
+    writeFileSync(claimedPath, '')
+    // Set mtime to 60 seconds ago
+    const oldTime = new Date(Date.now() - 60_000)
+    utimesSync(claimedPath, oldTime, oldTime)
+
+    const timer = startApprovalPoller({
+      stateDir: dir,
+      sendNotification: async () => {},
+    })
+
+    await new Promise(r => setTimeout(r, 6000))
+    stopApprovalPoller(timer)
+
+    // Should be renamed back to unclaimed
+    expect(existsSync(join(approvedDir, '789'))).toBe(true)
+    expect(existsSync(join(approvedDir, '789.claimed'))).toBe(false)
+  }, 10000)
+})
+
+describe('notifications', () => {
+  it('new session notification sent to allowFrom', async () => {
+    const dir = makeTmp()
+    const { opts, calls } = makeOpts(dir, { label: 'first' })
+    const mgr1 = createSessionManager(opts)
+    mgr1.register()
+
+    const { opts: opts2, calls: calls2 } = makeOpts(dir, { label: 'second' })
+    const mgr2 = createSessionManager(opts2)
+    mgr2.register()
+
+    // Wait for async notifications to fire
+    await new Promise(r => setTimeout(r, 100))
+
+    const notifCalls = calls2.filter(c => c.method === 'sendNotification')
+    expect(notifCalls.length).toBe(2)
+    expect(notifCalls[0].args[0]).toBe('111')
+    expect(notifCalls[0].args[1]).toContain('New session started: second')
+    expect(notifCalls[0].args[1]).toContain('Currently active: first')
+    expect(notifCalls[1].args[0]).toBe('222')
+  })
+
+  it('failover notification sent', async () => {
+    const dir = makeTmp()
+    const now = Date.now()
+    writeStateFile(dir, {
+      sessions: {
+        'dead-active': {
+          pid: 999999,
+          instanceId: '999999-0',
+          label: 'dead-active',
+          startedAt: new Date(now - 2000).toISOString(),
+          active: true,
+        },
+        'alive-inactive': {
+          pid: process.pid,
+          instanceId: `${process.pid}-${now}`,
+          label: 'alive',
+          startedAt: new Date(now - 1000).toISOString(),
+          active: false,
+        },
+      },
+      ackedMessages: [],
+      lastInbound: {},
+    })
+
+    const { opts, calls } = makeOpts(dir)
+    const mgr = createSessionManager(opts)
+    mgr.getAll()
+
+    // Wait for async notifications
+    await new Promise(r => setTimeout(r, 100))
+
+    const notifCalls = calls.filter(c => c.method === 'sendNotification')
+    expect(notifCalls.length).toBe(2)
+    expect(notifCalls[0].args[1]).toContain('Session switched to: alive')
+    expect(notifCalls[0].args[1]).toContain('previous session ended')
+  })
+
+  it('dead session cache file deleted', () => {
+    const dir = makeTmp()
+    const now = Date.now()
+
+    // Write a cache file for the dead session
+    writeFileSync(join(dir, 'cache-dead-session.json'), '{}')
+
+    writeStateFile(dir, {
+      sessions: {
+        'dead-session': {
+          pid: 999999,
+          instanceId: '999999-0',
+          label: 'dead',
+          startedAt: new Date(now - 2000).toISOString(),
+          active: false,
+        },
+      },
+      ackedMessages: [],
+      lastInbound: {},
+    })
+
+    const { opts } = makeOpts(dir)
+    const mgr = createSessionManager(opts)
+    mgr.register()
+
+    // Cache file for dead session should be cleaned up
+    expect(existsSync(join(dir, 'cache-dead-session.json'))).toBe(false)
   })
 })
