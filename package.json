@@ -1,0 +1,18 @@
+{
+  "name": "cc-telegram-plus",
+  "version": "0.1.0",
+  "description": "Enhanced Telegram channel for Claude Code — drop-in replacement with more features",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "grammy": "^1.21.0"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "license": "MIT"
+}
