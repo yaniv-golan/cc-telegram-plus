@@ -1,4 +1,4 @@
-import type { Access } from '../src/types.ts'
+import type { Access, Deps, SessionManager, MessageCache } from '../src/types.ts'
 
 // ─── Access factory ───────────────────────────────────────────────────────────
 
@@ -234,6 +234,69 @@ export function createReactionCtx(emoji: string, opts: ReactionCtxOpts = {}) {
   }
 
   return ctx
+}
+
+// ─── Mock MCP factory ────────────────────────────────────────────────────────
+
+export function createMockMcp() {
+  const notifications: any[] = []
+  const requestHandlers: Map<any, any> = new Map()
+
+  const mcp: any = {
+    notification(params: any) {
+      notifications.push(params)
+    },
+    setRequestHandler(schema: any, handler: any) {
+      requestHandlers.set(schema, handler)
+    },
+    _requestHandlers: requestHandlers,
+  }
+
+  return { mcp, notifications }
+}
+
+// ─── Mock Deps factory ────────────────────────────────────────────────────────
+
+export function createMockDeps(overrides: Partial<Deps> = {}): Deps {
+  const { bot } = createMockBot()
+  const { mcp } = createMockMcp()
+
+  const cache: MessageCache = {
+    get(_chatId: string, _messageId: string) { return undefined },
+    set(_chatId: string, _messageId: string, _content: string) {},
+    flush() {},
+    destroy() {},
+  }
+
+  const sessions: SessionManager = {
+    register() { return 'mock-session-id' },
+    isActive() { return false },
+    watch() {},
+    stop() {},
+    activate() {},
+    switchTo(_sessionId: string) {},
+    getAll() { return {} },
+    getDeepLink(_sessionId: string) { return '' },
+    addAckedMessage(_chatId: string, _messageId: number) {},
+    clearAckedMessages(_chatId: string) { return [] },
+    getLastInbound(_chatId: string) { return undefined },
+    setLastInbound(_chatId: string, _messageId: string) {},
+  }
+
+  const defaults: Deps = {
+    bot: bot as any,
+    mcp: mcp as any,
+    cache,
+    sessions,
+    loadAccess: () => createAccess(),
+    saveAccess: (_access: any) => {},
+    withAccessLock: <T>(fn: () => T) => fn(),
+    stateDir: '/tmp/test-state',
+    botUsername: 'testbot',
+    transcribe: undefined,
+  }
+
+  return { ...defaults, ...overrides }
 }
 
 // ─── Callback query context factory ──────────────────────────────────────────
