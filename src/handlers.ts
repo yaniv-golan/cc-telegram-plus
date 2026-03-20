@@ -40,6 +40,9 @@ export function registerHandlers(deps: Deps): void {
       params: { content, meta },
     })
 
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), content)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
+
     await applyAck(ctx, access, deps)
   })
 
@@ -69,6 +72,9 @@ export function registerHandlers(deps: Deps): void {
       params: { content: fullContent, meta },
     })
 
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
+
     await applyAck(ctx, access, deps)
   })
 
@@ -97,6 +103,9 @@ export function registerHandlers(deps: Deps): void {
       params: { content: fullContent, meta },
     })
 
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
+
     await applyAck(ctx, access, deps)
   })
 
@@ -124,6 +133,9 @@ export function registerHandlers(deps: Deps): void {
       method: 'notifications/claude/channel',
       params: { content: fullContent, meta },
     })
+
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
 
     await applyAck(ctx, access, deps)
   })
@@ -166,6 +178,9 @@ export function registerHandlers(deps: Deps): void {
       params: { content: fullContent, meta },
     })
 
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
+
     await applyAck(ctx, access, deps)
   })
 
@@ -194,6 +209,9 @@ export function registerHandlers(deps: Deps): void {
       params: { content: fullContent, meta },
     })
 
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
+
     await applyAck(ctx, access, deps)
   })
 
@@ -215,10 +233,16 @@ export function registerHandlers(deps: Deps): void {
     const meta = buildMeta(ctx)
     meta.media_token = `sticker:${sticker.file_id}:${sticker.file_unique_id}`
 
+    const replyPrefix = extractReplyContext(ctx)
+    const fullContent = replyPrefix ? replyPrefix + content : content
+
     mcp.notification({
       method: 'notifications/claude/channel',
-      params: { content, meta },
+      params: { content: fullContent, meta },
     })
+
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
 
     await applyAck(ctx, access, deps)
   })
@@ -268,10 +292,10 @@ export function registerHandlers(deps: Deps): void {
           content,
           meta: {
             chat_id: chatId,
-            message_id: reaction.message_id,
+            message_id: String(reaction.message_id),
             user: reaction.user?.first_name ?? reaction.user?.username ?? 'unknown',
             user_id: userId,
-            ts: Math.floor(Date.now() / 1000),
+            ts: new Date().toISOString(),
           },
         },
       })
@@ -293,7 +317,8 @@ export function registerHandlers(deps: Deps): void {
       }
       const targetSessionId = data.slice('switch_'.length)
       sessions.switchTo(targetSessionId)
-      await ctx.answerCallbackQuery({ text: 'Switched' })
+      const label = sessions.getAll()[targetSessionId]?.label ?? targetSessionId
+      await ctx.answerCallbackQuery({ text: `Switched to: ${label}` })
       return
     }
 
@@ -303,7 +328,7 @@ export function registerHandlers(deps: Deps): void {
       message_id: ctx.callbackQuery.message?.message_id,
       user: ctx.from.first_name ?? ctx.from.username ?? 'unknown',
       user_id: userId,
-      ts: ctx.callbackQuery.message?.date ?? Math.floor(Date.now() / 1000),
+      ts: new Date((ctx.callbackQuery.message?.date ?? 0) * 1000).toISOString(),
       reply_to_message_id: ctx.callbackQuery.message?.message_id,
     }
 
@@ -354,7 +379,7 @@ function buildMeta(ctx: any): Record<string, any> {
     message_id: ctx.message.message_id,
     user: ctx.from?.first_name ?? ctx.from?.username ?? 'unknown',
     user_id: String(ctx.from?.id ?? ''),
-    ts: ctx.message.date,
+    ts: new Date((ctx.message?.date ?? 0) * 1000).toISOString(),
   }
 }
 

@@ -680,3 +680,93 @@ describe('bot commands', () => {
     expect(switchToCalls).toHaveLength(0)
   })
 })
+
+// ─── cache + setLastInbound + ts format ─────────────────────────────────────
+
+describe('inbound message cache and setLastInbound', () => {
+  let deps: Deps
+  let notifications: any[]
+  let cacheSetCalls: any[]
+  let setLastInboundCalls: any[]
+
+  beforeEach(() => {
+    const { bot } = createMockBot()
+    const { mcp, notifications: notifs } = createMockMcp()
+    notifications = notifs
+    cacheSetCalls = []
+    setLastInboundCalls = []
+    deps = createMockDeps({
+      bot,
+      mcp,
+      cache: {
+        get: () => undefined,
+        set: (chatId: string, messageId: string, content: string) => {
+          cacheSetCalls.push({ chatId, messageId, content })
+        },
+        flush: () => {},
+        destroy: () => {},
+      },
+      sessions: {
+        ...createMockDeps().sessions,
+        setLastInbound: (chatId: string, messageId: string) => {
+          setLastInboundCalls.push({ chatId, messageId })
+        },
+      },
+    })
+    registerHandlers(deps)
+  })
+
+  it('inbound message stored in cache after text deliver', async () => {
+    const ctx = createTextCtx('hello world', { userId: 12345, chatId: 200, messageId: 7 })
+    await triggerHandler(deps.bot, 'message:text', ctx)
+
+    expect(cacheSetCalls).toHaveLength(1)
+    expect(cacheSetCalls[0]).toEqual({ chatId: '200', messageId: '7', content: 'hello world' })
+  })
+
+  it('setLastInbound called on deliver', async () => {
+    const ctx = createTextCtx('hi', { userId: 12345, chatId: 200, messageId: 7 })
+    await triggerHandler(deps.bot, 'message:text', ctx)
+
+    expect(setLastInboundCalls).toHaveLength(1)
+    expect(setLastInboundCalls[0]).toEqual({ chatId: '200', messageId: '7' })
+  })
+
+  it('ts meta field is ISO 8601', async () => {
+    const ctx = createTextCtx('test', { userId: 12345 })
+    await triggerHandler(deps.bot, 'message:text', ctx)
+
+    expect(notifications).toHaveLength(1)
+    const ts = notifications[0].params.meta.ts
+    expect(ts).toContain('T')
+    expect(ts).toContain('Z')
+  })
+})
+
+// ─── sticker with reply context ─────────────────────────────────────────────
+
+describe('sticker with reply context', () => {
+  it('sticker with reply context includes reply prefix', async () => {
+    const { bot } = createMockBot()
+    const { mcp, notifications } = createMockMcp()
+    const deps = createMockDeps({ bot, mcp })
+    registerHandlers(deps)
+
+    const ctx = createMediaCtx('sticker', {
+      userId: 12345,
+      fileId: 'sticker_file_id',
+      fileUniqueId: 'sticker_unique',
+    })
+    ctx.message.sticker.emoji = '\u{1F600}'
+    ctx.message.reply_to_message = {
+      message_id: 5,
+      text: 'original message',
+    }
+    await triggerHandler(deps.bot, 'message:sticker', ctx)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0].params.content).toBe(
+      '[Replying to: "original message"]\n(sticker: \u{1F600})',
+    )
+  })
+})
