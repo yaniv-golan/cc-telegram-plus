@@ -4,6 +4,11 @@
 
 # cc-telegram-plus
 
+[![CI](https://github.com/yaniv-golan/cc-telegram-plus/actions/workflows/ci.yml/badge.svg)](https://github.com/yaniv-golan/cc-telegram-plus/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/github/v/tag/yaniv-golan/cc-telegram-plus?label=version)](https://github.com/yaniv-golan/cc-telegram-plus/releases)
+[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
+
 A community-maintained Telegram channel plugin for Claude Code that extends the official plugin with all media types, voice transcription, reply context, emoji reactions, inline buttons, multi-session management, and a comprehensive test suite. Drop-in compatible — reads the same config files, exposes the same commands.
 
 ## Feature comparison
