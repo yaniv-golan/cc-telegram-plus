@@ -43,7 +43,6 @@ export function startActivityWatcher(opts: {
   stateDir: string
   bot: Bot
   getChatIds: () => string[]
-  getSessionId: () => string
   isActive: () => boolean
 }): { stop: () => void } {
   const activityFile = join(opts.stateDir, 'activity.jsonl')
@@ -74,8 +73,7 @@ export function startActivityWatcher(opts: {
       let entry: ActivityEntry
       try { entry = JSON.parse(line) } catch { continue }
 
-      // Only process events from our session
-      if (entry.session_id && entry.session_id !== opts.getSessionId()) continue
+      // Only the active session processes events (checked via isActive above)
 
       // Stop event — delete progress message
       if (entry.type === 'stop' || entry.type === 'subagent_stop') {

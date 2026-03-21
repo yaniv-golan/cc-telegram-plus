@@ -376,7 +376,6 @@ const activityWatcher = startActivityWatcher({
     const access = loadAccess()
     return access.allowFrom
   },
-  getSessionId: () => sessionId,
   isActive: () => sessions.isActive(),
 })
 
