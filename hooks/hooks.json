@@ -1,7 +1,7 @@
 {
   "description": "Forward Claude's tool activity and permission prompts to Telegram as progress indicators",
   "hooks": {
-    "PostToolUse": [
+    "PreToolUse": [
       {
         "matcher": "",
         "hooks": [
