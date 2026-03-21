@@ -337,6 +337,8 @@ registerHandlers(deps)
 void bot.api.setMyCommands(
   [
     { command: 'sessions', description: 'List active sessions' },
+    { command: 'switch', description: 'Switch to another session' },
+    { command: 'name', description: 'Rename the active session' },
     { command: 'status', description: 'Show current active session' },
     { command: 'chatid', description: 'Show this chat ID' },
   ],
