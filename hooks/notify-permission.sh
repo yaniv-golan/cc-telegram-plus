@@ -55,7 +55,8 @@ if not chat_ids:
 # Format the message
 text = f'\u26a0\ufe0f <b>Approval needed</b>\n{message}'
 
-# Send to each allowFrom user
+# Send to each allowFrom user and track message IDs for cleanup
+sent_messages = []
 for chat_id in chat_ids:
     try:
         import urllib.request
@@ -66,16 +67,19 @@ for chat_id in chat_ids:
             'parse_mode': 'HTML',
         }).encode()
         req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-        urllib.request.urlopen(req, timeout=5)
+        resp = json.loads(urllib.request.urlopen(req, timeout=5).read())
+        if resp.get('ok') and resp.get('result', {}).get('message_id'):
+            sent_messages.append({'chat_id': chat_id, 'message_id': resp['result']['message_id']})
     except:
         pass
 
-# Also write to activity file
+# Write to activity file with sent message IDs so watcher can clean up
 entry = {
     'ts': datetime.datetime.utcnow().isoformat() + 'Z',
     'session_id': data.get('session_id', ''),
     'type': 'permission',
     'message': message[:100],
+    'sent_messages': sent_messages,
 }
 try:
     with open(os.path.expanduser('$ACTIVITY_FILE'), 'a') as f:

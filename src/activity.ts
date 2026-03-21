@@ -10,6 +10,7 @@ type ActivityEntry = {
   detail?: string
   agent_type?: string
   message?: string
+  sent_messages?: { chat_id: string; message_id: number }[]
 }
 
 function formatEntry(entry: ActivityEntry): string | null {
@@ -63,6 +64,7 @@ export function startActivityWatcher(opts: {
   const activityFile = join(opts.stateDir, 'activity.jsonl')
   let lastSize = 0
   let progressMessageIds: Record<string, number> = {} // chatId → msgId
+  let permissionMessageIds: { chat_id: string; message_id: number }[] = [] // from hook
   let lastLabel = ''
 
   // Ensure file exists
@@ -77,7 +79,11 @@ export function startActivityWatcher(opts: {
     for (const [chatId, msgId] of Object.entries(progressMessageIds)) {
       opts.bot.api.deleteMessage(chatId, msgId).catch(() => {})
     }
+    for (const { chat_id, message_id } of permissionMessageIds) {
+      opts.bot.api.deleteMessage(chat_id, message_id).catch(() => {})
+    }
     progressMessageIds = {}
+    permissionMessageIds = []
     lastLabel = ''
   }
 
@@ -99,10 +105,16 @@ export function startActivityWatcher(opts: {
       let entry: ActivityEntry
       try { entry = JSON.parse(line) } catch { continue }
 
-      // Stop event — delete progress message
+      // Stop event — delete all progress and permission messages
       if (entry.type === 'stop' || entry.type === 'subagent_stop') {
         deleteProgressMessages()
         continue
+      }
+
+      // Track permission messages sent by the hook for cleanup
+      if (entry.type === 'permission' && entry.sent_messages?.length) {
+        permissionMessageIds.push(...entry.sent_messages)
+        continue // Already sent by hook script, don't send again
       }
 
       const label = formatEntry(entry)

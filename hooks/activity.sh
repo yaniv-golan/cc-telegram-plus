@@ -21,7 +21,7 @@ session_id = data.get('session_id', '')
 
 entry = {'ts': datetime.datetime.utcnow().isoformat() + 'Z', 'session_id': session_id}
 
-if event == 'PostToolUse':
+if event in ('PreToolUse', 'PostToolUse'):
     tool = data.get('tool_name', '')
     # Skip telegram MCP tools — they're outbound replies, not progress
     if 'telegram' in tool.lower():
