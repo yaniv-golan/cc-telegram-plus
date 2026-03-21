@@ -10,6 +10,11 @@ function makeTmp(): string {
   return dir
 }
 
+/** Write a pidfile so isSessionAlive recognizes this PID as ours */
+function writePidfile(stateDir: string, pid: number, instanceId: string): void {
+  writeFileSync(join(stateDir, `session-${pid}.pid`), instanceId)
+}
+
 function makeOpts(stateDir: string, overrides: Record<string, any> = {}) {
   const calls: { method: string; args: any[] }[] = []
 
@@ -117,6 +122,7 @@ describe('stale cleanup', () => {
   it('active session dies and first remaining takes over', () => {
     const dir = makeTmp()
     const now = Date.now()
+    const aliveInstanceId = `${process.pid}-${now}`
     writeStateFile(dir, {
       sessions: {
         'dead-active': {
@@ -128,7 +134,7 @@ describe('stale cleanup', () => {
         },
         'alive-inactive': {
           pid: process.pid,
-          instanceId: `${process.pid}-${now}`,
+          instanceId: aliveInstanceId,
           label: 'alive',
           startedAt: new Date(now - 1000).toISOString(),
           active: false,
@@ -137,6 +143,7 @@ describe('stale cleanup', () => {
       ackedMessages: [],
       lastInbound: {},
     })
+    writePidfile(dir, process.pid, aliveInstanceId)
 
     const { opts } = makeOpts(dir)
     const mgr = createSessionManager(opts)
@@ -387,6 +394,7 @@ describe('notifications', () => {
   it('failover notification sent', async () => {
     const dir = makeTmp()
     const now = Date.now()
+    const aliveInstanceId = `${process.pid}-${now}`
     writeStateFile(dir, {
       sessions: {
         'dead-active': {
@@ -398,7 +406,7 @@ describe('notifications', () => {
         },
         'alive-inactive': {
           pid: process.pid,
-          instanceId: `${process.pid}-${now}`,
+          instanceId: aliveInstanceId,
           label: 'alive',
           startedAt: new Date(now - 1000).toISOString(),
           active: false,
@@ -407,6 +415,7 @@ describe('notifications', () => {
       ackedMessages: [],
       lastInbound: {},
     })
+    writePidfile(dir, process.pid, aliveInstanceId)
 
     const { opts, calls } = makeOpts(dir)
     const mgr = createSessionManager(opts)

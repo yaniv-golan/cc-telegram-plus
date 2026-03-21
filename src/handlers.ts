@@ -401,7 +401,7 @@ async function applyAck(ctx: any, access: any, deps: Deps): Promise<void> {
 async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   const text: string = ctx.message.text
   const parts = text.split(/\s+/)
-  const cmd = parts[0].toLowerCase()
+  const cmd = parts[0].toLowerCase().split('@')[0]
   const chatId = String(ctx.chat.id)
   const userId = String(ctx.from.id)
 

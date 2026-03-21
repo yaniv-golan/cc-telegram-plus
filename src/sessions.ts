@@ -1,15 +1,40 @@
 import { readFileSync, writeFileSync, renameSync, unlinkSync, existsSync, readdirSync, mkdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
-import { withLock, isProcessAlive } from './lock.ts'
+import { withLock, isProcessAlive, INSTANCE_ID } from './lock.ts'
 import type { Session, SessionManager, Access, InlineButton } from './types.ts'
-
-const INSTANCE_ID = `${process.pid}-${Date.now()}`
 
 type StateFile = {
   sessions: Record<string, Session>
   ackedMessages: string[]
   lastInbound: Record<string, string>
+}
+
+/**
+ * Check if a session is still alive. PID alone is unreliable because macOS
+ * aggressively reuses PIDs (especially for bun processes). We write a pidfile
+ * containing the instanceId at registration; if the PID is alive but the
+ * pidfile is missing or has a different instanceId, it's a reused PID.
+ */
+function isSessionAlive(session: Session, stateDir?: string): boolean {
+  if (!isProcessAlive(session.pid)) return false
+  if (!stateDir) return true // can't verify without stateDir, assume alive
+  const pidfile = join(stateDir, `session-${session.pid}.pid`)
+  try {
+    const content = readFileSync(pidfile, 'utf8').trim()
+    return content === session.instanceId
+  } catch {
+    // Pidfile missing — PID is alive but not our process
+    return false
+  }
+}
+
+function writePidfile(stateDir: string): void {
+  writeFileSync(join(stateDir, `session-${process.pid}.pid`), INSTANCE_ID)
+}
+
+function removePidfile(stateDir: string): void {
+  try { unlinkSync(join(stateDir, `session-${process.pid}.pid`)) } catch {}
 }
 
 function readState(stateDir: string): StateFile {
@@ -38,7 +63,7 @@ function cleanStaleSessions(state: StateFile, opts?: {
   const toRemove: string[] = []
 
   for (const [id, session] of Object.entries(state.sessions)) {
-    if (!isProcessAlive(session.pid)) {
+    if (!isSessionAlive(session, opts?.stateDir)) {
       toRemove.push(id)
       if (session.active) activeRemoved = true
     }
@@ -124,6 +149,8 @@ export function createSessionManager(opts: {
         return activeSession
       })
 
+      writePidfile(stateDir)
+
       if (notifyNewSession) {
         const access = loadAccess()
         for (const userId of access.allowFrom) {
@@ -201,6 +228,8 @@ export function createSessionManager(opts: {
       lockedOp((state) => {
         delete state.sessions[sessionId]
       })
+
+      removePidfile(stateDir)
 
       // Clean up cache file
       const cacheFile = join(stateDir, `cache-${sessionId}.json`)
