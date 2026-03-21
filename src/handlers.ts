@@ -480,10 +480,22 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     if (ctx.chat.type !== 'private') return true
-    const targetId = parts[1]
-    if (targetId) {
+    const targetArg = parts.slice(1).join(' ').trim()
+    if (targetArg) {
+      // Resolve by ID or label
+      const all = deps.sessions.getAll()
+      let targetId = targetArg
+      if (!all[targetArg]) {
+        const match = Object.entries(all).find(([, s]) => s.label === targetArg)
+        if (match) targetId = match[0]
+      }
+      if (!all[targetId]) {
+        await deps.bot.api.sendMessage(chatId, `Session not found: ${targetArg}`)
+        return true
+      }
       deps.sessions.switchTo(targetId, { immediate: true })
-      await deps.bot.api.sendMessage(chatId, `Switched to ${targetId}`)
+      const label = all[targetId]?.label ?? targetId
+      await deps.bot.api.sendMessage(chatId, `Switched to ${label}`)
     } else {
       // No argument — show inline buttons for each session
       const all = deps.sessions.getAll()

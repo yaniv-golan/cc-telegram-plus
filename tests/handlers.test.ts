@@ -593,6 +593,7 @@ describe('bot commands', () => {
       sessions: {
         ...deps.sessions,
         switchTo: (id: string) => { switchToCalls.push(id) },
+        getAll: () => ({ target123: { pid: 1, instanceId: '1-0', label: 'test', startedAt: new Date().toISOString(), active: false } }),
       },
     })
     registerHandlers(deps)
