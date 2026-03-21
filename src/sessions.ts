@@ -279,7 +279,7 @@ export function createSessionManager(opts: {
       const targetSession = readState(stateDir).sessions[targetId]
       const targetLabel = targetSession?.label ?? targetId
       for (const chatId of access.allowFrom) {
-        sendNotification(chatId, `\u{1F7E2} <b>${targetLabel}</b>`, undefined, 'HTML', true).catch(() => {})
+        sendNotification(chatId, `Active session: <b>${targetLabel}</b>`, undefined, 'HTML', true).catch(() => {})
       }
     },
 

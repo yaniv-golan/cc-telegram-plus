@@ -14,8 +14,12 @@ export function registerHandlers(deps: Deps): void {
       const userId = String(ctx.from.id)
       const access = deps.withAccessLock(() => deps.loadAccess())
       if (isUserAuthorized(userId, access)) {
-        deps.sessions.renameSession(text.trim())
-        await bot.api.sendMessage(String(ctx.chat.id), `Session renamed: ${text.trim()}`)
+        const newName = text.trim()
+        const cid = String(ctx.chat.id)
+        deps.sessions.renameSession(newName)
+        await bot.api.sendMessage(cid, `Renamed to ${newName}`)
+        const pinned = await bot.api.sendMessage(cid, `Active session: <b>${newName}</b>`, { parse_mode: 'HTML' })
+        await bot.api.pinChatMessage(cid, pinned.message_id, { disable_notification: true }).catch(() => {})
       }
       return
     }
@@ -333,7 +337,9 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
       return true
     }
     deps.sessions.renameSession(newName)
-    await deps.bot.api.sendMessage(chatId, `Session renamed: ${newName}`)
+    await deps.bot.api.sendMessage(chatId, `Renamed to ${newName}`)
+    const pinned = await deps.bot.api.sendMessage(chatId, `Active session: <b>${newName}</b>`, { parse_mode: 'HTML' })
+    await deps.bot.api.pinChatMessage(chatId, pinned.message_id, { disable_notification: true }).catch(() => {})
     return true
   }
 
