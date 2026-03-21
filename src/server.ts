@@ -380,10 +380,22 @@ process.on('beforeExit', cleanup)
 
 // When CC closes the stdio pipe (session ends), exit cleanly.
 // Without this, bot.start() keeps the process alive as a zombie.
-// Only stdin 'end' means the CC session truly ended. mcp.onclose can
-// fire during CC internal operations (compaction, long tasks) — don't
-// exit on it, just log. CC may reconnect.
+// Log to file for debugging session lifecycle issues.
 process.stdin.on('end', () => {
+  try {
+    const { appendFileSync } = require('node:fs')
+    appendFileSync('/tmp/cc-telegram-lifecycle.log',
+      `${new Date().toISOString()} stdin:end pid=${process.pid}\n`)
+  } catch {}
+  cleanup()
+  process.exit(0)
+})
+process.on('SIGTERM', () => {
+  try {
+    const { appendFileSync } = require('node:fs')
+    appendFileSync('/tmp/cc-telegram-lifecycle.log',
+      `${new Date().toISOString()} SIGTERM pid=${process.pid}\n`)
+  } catch {}
   cleanup()
   process.exit(0)
 })

@@ -328,7 +328,7 @@ export function registerHandlers(deps: Deps): void {
         return
       }
       const targetSessionId = data.slice('switch_'.length)
-      sessions.switchTo(targetSessionId)
+      sessions.switchTo(targetSessionId, { immediate: true })
       const label = sessions.getAll()[targetSessionId]?.label ?? targetSessionId
       await ctx.answerCallbackQuery({ text: `Switched to: ${label}` })
       return
@@ -482,7 +482,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     if (ctx.chat.type !== 'private') return true
     const targetId = parts[1]
     if (targetId) {
-      deps.sessions.switchTo(targetId)
+      deps.sessions.switchTo(targetId, { immediate: true })
       await deps.bot.api.sendMessage(chatId, `Switched to ${targetId}`)
     } else {
       // No argument — show inline buttons for each session
@@ -510,7 +510,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const targetId = parts[1].slice('switch_'.length)
-    deps.sessions.switchTo(targetId)
+    deps.sessions.switchTo(targetId, { immediate: true })
     await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
     return true
   }

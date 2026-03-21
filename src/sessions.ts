@@ -240,7 +240,15 @@ export function createSessionManager(opts: {
       }
     },
 
-    switchTo(targetId: string): void {
+    switchTo(targetId: string, opts?: { immediate?: boolean }): void {
+      // If this process is the active poller, stop polling BEFORE writing
+      // the switch. This prevents a 409 race: Telegram rejects concurrent
+      // getUpdates calls, and the old poller's grammY crashes on 409.
+      if (opts?.immediate && wasActive) {
+        stopPolling()
+        wasActive = false
+      }
+
       lockedOp((state) => {
         for (const [id, session] of Object.entries(state.sessions)) {
           session.active = id === targetId

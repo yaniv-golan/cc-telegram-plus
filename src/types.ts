@@ -62,7 +62,7 @@ export interface SessionManager {
   watch(): void
   stop(): void
   activate(): void
-  switchTo(sessionId: string): void
+  switchTo(sessionId: string, opts?: { immediate?: boolean }): void
   getAll(): Record<string, Session>
   getDeepLink(sessionId: string): string
   addAckedMessage(chatId: string, messageId: number): void
