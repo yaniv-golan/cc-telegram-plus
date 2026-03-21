@@ -159,6 +159,32 @@ claude --dangerously-load-development-channels plugin:telegram@local \
 | `edit_message` | Edit a previously sent message |
 | `fetch_media` | Download a media attachment by token |
 
+## Advanced configuration
+
+These optional fields in `~/.claude/channels/telegram/access.json` let
+you customize the bot's behavior:
+
+| Field | Default | Description |
+|---|---|---|
+| `ackReaction` | *(none)* | Emoji to react with when a message is received (e.g. `"👀"`). Cleared when Claude replies. Shows the user their message was seen. |
+| `replyToMode` | `"off"` | Threading for Claude's replies: `"off"` = no threading, `"first"` = first chunk threads under your message, `"all"` = all chunks thread |
+| `textChunkLimit` | `4096` | Max characters per message before splitting (Telegram's hard limit is 4096) |
+| `chunkMode` | `"length"` | How to split long replies: `"length"` = hard character cut, `"newline"` = prefer paragraph boundaries |
+| `mentionPatterns` | *(none)* | Array of regex patterns that trigger the bot in groups, beyond @botname (e.g. `["hey claude", "cc:"]`) |
+
+Example:
+```json
+{
+  "dmPolicy": "allowlist",
+  "allowFrom": ["23627540"],
+  "groups": {},
+  "pending": {},
+  "ackReaction": "👀",
+  "replyToMode": "first",
+  "chunkMode": "newline"
+}
+```
+
 ## Environment variables
 
 | Variable | Required | Description |
