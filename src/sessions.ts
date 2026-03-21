@@ -70,10 +70,12 @@ function cleanStaleSessions(state: StateFile, opts?: {
   }
 
   for (const id of toRemove) {
+    const session = state.sessions[id]
     delete state.sessions[id]
     cleaned = true
-    if (opts) {
+    if (opts && session) {
       try { unlinkSync(join(opts.stateDir, `cache-${id}.json`)) } catch {}
+      try { unlinkSync(join(opts.stateDir, `session-${session.pid}.pid`)) } catch {}
     }
   }
 
@@ -153,10 +155,11 @@ export function createSessionManager(opts: {
 
       if (notifyNewSession) {
         const access = loadAccess()
+        const shortLabel = label.includes(' \u{2014} ') ? label.split(' \u{2014} ')[1] : label
         for (const userId of access.allowFrom) {
           void sendNotification(userId,
             `New session: ${label}\nActive: ${notifyNewSession.label}`,
-            [[{ text: `\u{1F504} ${label}`, callback_data: `switch_${sessionId}` }, { text: 'Keep', callback_data: 'switch_dismiss' }]]
+            [[{ text: `\u{1F504} ${shortLabel}`, callback_data: `switch_${sessionId}` }, { text: 'Keep', callback_data: 'switch_dismiss' }]]
           )
         }
       }

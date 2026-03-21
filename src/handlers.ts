@@ -5,10 +5,10 @@ export function registerHandlers(deps: Deps): void {
   const { bot, mcp, cache, sessions } = deps
 
   // ─── message:text (includes bot commands) ──────────────────────────────────
-  bot.on('message:text', async (ctx: any) => {
-    const text: string = ctx.message.text
+  bot.on('message:text', async (ctx) => {
+    const text = ctx.message.text
 
-    // ─── Reply to /name prompt ────────────────────────────────────────────────
+    // Reply to /name prompt
     const replyTo = ctx.message?.reply_to_message
     if (replyTo?.from?.id === bot.botInfo?.id && replyTo?.text?.startsWith('Reply to this message with the new session name')) {
       const userId = String(ctx.from.id)
@@ -20,153 +20,43 @@ export function registerHandlers(deps: Deps): void {
       return
     }
 
-    // ─── Bot commands ────────────────────────────────────────────────────────
+    // Bot commands
     if (text.startsWith('/')) {
       const handled = await handleCommand(ctx, deps)
       if (handled) return
     }
 
-    // ─── Gate ────────────────────────────────────────────────────────────────
-    const result = runGate(ctx, deps)
-    if (result.action === 'drop') return
-    if (result.action === 'pair') {
-      await bot.api.sendMessage(
-        String(ctx.chat.id),
-        `Your pairing code is: ${result.code}`,
-      )
-      return
-    }
-
-    // ─── Deliver ─────────────────────────────────────────────────────────────
-    const { access } = result
-    await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
-
-    let content = text
-    const replyPrefix = extractReplyContext(ctx)
-    if (replyPrefix) content = replyPrefix + content
-
-    const meta = buildMeta(ctx)
-
-    mcp.notification({
-      method: 'notifications/claude/channel',
-      params: { content, meta },
-    })
-
-    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), content)
-    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-    await applyAck(ctx, access, deps)
+    // Deliver text message
+    await handleInbound(ctx, text, undefined, deps)
   })
 
-  // ─── message:photo ─────────────────────────────────────────────────────────
-  bot.on('message:photo', async (ctx: any) => {
-    const result = runGate(ctx, deps)
-    if (result.action === 'drop') return
-    if (result.action === 'pair') {
-      await bot.api.sendMessage(String(ctx.chat.id), `Your pairing code is: ${result.code}`)
-      return
-    }
+  // ─── Media handlers ───────────────────────────────────────────────────────
 
-    const { access } = result
-    await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
-
+  bot.on('message:photo', async (ctx) => {
     const photos = ctx.message.photo
     const best = photos[photos.length - 1]
     const content = ctx.message.caption || '(photo)'
-    const meta = buildMeta(ctx)
-    meta.media_token = `photo:${best.file_id}:${best.file_unique_id}`
-
-    const replyPrefix = extractReplyContext(ctx)
-    const fullContent = replyPrefix ? replyPrefix + content : content
-
-    mcp.notification({
-      method: 'notifications/claude/channel',
-      params: { content: fullContent, meta },
-    })
-
-    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
-    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-    await applyAck(ctx, access, deps)
+    const mediaToken = `photo:${best.file_id}:${best.file_unique_id}`
+    await handleInbound(ctx, content, mediaToken, deps)
   })
 
-  // ─── message:document ──────────────────────────────────────────────────────
-  bot.on('message:document', async (ctx: any) => {
-    const result = runGate(ctx, deps)
-    if (result.action === 'drop') return
-    if (result.action === 'pair') {
-      await bot.api.sendMessage(String(ctx.chat.id), `Your pairing code is: ${result.code}`)
-      return
-    }
-
-    const { access } = result
-    await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
-
+  bot.on('message:document', async (ctx) => {
     const doc = ctx.message.document
     const content = ctx.message.caption || doc.file_name || '(document)'
-    const meta = buildMeta(ctx)
-    meta.media_token = `document:${doc.file_id}:${doc.file_unique_id}`
-
-    const replyPrefix = extractReplyContext(ctx)
-    const fullContent = replyPrefix ? replyPrefix + content : content
-
-    mcp.notification({
-      method: 'notifications/claude/channel',
-      params: { content: fullContent, meta },
-    })
-
-    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
-    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-    await applyAck(ctx, access, deps)
+    const mediaToken = `document:${doc.file_id}:${doc.file_unique_id}`
+    await handleInbound(ctx, content, mediaToken, deps)
   })
 
-  // ─── message:video ─────────────────────────────────────────────────────────
-  bot.on('message:video', async (ctx: any) => {
-    const result = runGate(ctx, deps)
-    if (result.action === 'drop') return
-    if (result.action === 'pair') {
-      await bot.api.sendMessage(String(ctx.chat.id), `Your pairing code is: ${result.code}`)
-      return
-    }
-
-    const { access } = result
-    await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
-
+  bot.on('message:video', async (ctx) => {
     const video = ctx.message.video
     const content = ctx.message.caption || '(video)'
-    const meta = buildMeta(ctx)
-    meta.media_token = `video:${video.file_id}:${video.file_unique_id}`
-
-    const replyPrefix = extractReplyContext(ctx)
-    const fullContent = replyPrefix ? replyPrefix + content : content
-
-    mcp.notification({
-      method: 'notifications/claude/channel',
-      params: { content: fullContent, meta },
-    })
-
-    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
-    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-    await applyAck(ctx, access, deps)
+    const mediaToken = `video:${video.file_id}:${video.file_unique_id}`
+    await handleInbound(ctx, content, mediaToken, deps)
   })
 
-  // ─── message:voice ─────────────────────────────────────────────────────────
-  bot.on('message:voice', async (ctx: any) => {
-    const result = runGate(ctx, deps)
-    if (result.action === 'drop') return
-    if (result.action === 'pair') {
-      await bot.api.sendMessage(String(ctx.chat.id), `Your pairing code is: ${result.code}`)
-      return
-    }
-
-    const { access } = result
-    await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
-
+  bot.on('message:voice', async (ctx) => {
     const voice = ctx.message.voice
-    const meta = buildMeta(ctx)
-    meta.media_token = `voice:${voice.file_id}:${voice.file_unique_id}`
+    const mediaToken = `voice:${voice.file_id}:${voice.file_unique_id}`
 
     let content = '(voice message)'
     if (deps.transcribe) {
@@ -182,121 +72,48 @@ export function registerHandlers(deps: Deps): void {
       }
     }
 
-    const replyPrefix = extractReplyContext(ctx)
-    const fullContent = replyPrefix ? replyPrefix + content : content
-
-    mcp.notification({
-      method: 'notifications/claude/channel',
-      params: { content: fullContent, meta },
-    })
-
-    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
-    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-    await applyAck(ctx, access, deps)
+    await handleInbound(ctx, content, mediaToken, deps)
   })
 
-  // ─── message:audio ─────────────────────────────────────────────────────────
-  bot.on('message:audio', async (ctx: any) => {
-    const result = runGate(ctx, deps)
-    if (result.action === 'drop') return
-    if (result.action === 'pair') {
-      await bot.api.sendMessage(String(ctx.chat.id), `Your pairing code is: ${result.code}`)
-      return
-    }
-
-    const { access } = result
-    await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
-
+  bot.on('message:audio', async (ctx) => {
     const audio = ctx.message.audio
     const content = ctx.message.caption || audio.title || audio.file_name || '(audio)'
-    const meta = buildMeta(ctx)
-    meta.media_token = `audio:${audio.file_id}:${audio.file_unique_id}`
-
-    const replyPrefix = extractReplyContext(ctx)
-    const fullContent = replyPrefix ? replyPrefix + content : content
-
-    mcp.notification({
-      method: 'notifications/claude/channel',
-      params: { content: fullContent, meta },
-    })
-
-    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
-    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-    await applyAck(ctx, access, deps)
+    const mediaToken = `audio:${audio.file_id}:${audio.file_unique_id}`
+    await handleInbound(ctx, content, mediaToken, deps)
   })
 
-  // ─── message:sticker ──────────────────────────────────────────────────────
-  bot.on('message:sticker', async (ctx: any) => {
-    const result = runGate(ctx, deps)
-    if (result.action === 'drop') return
-    if (result.action === 'pair') {
-      await bot.api.sendMessage(String(ctx.chat.id), `Your pairing code is: ${result.code}`)
-      return
-    }
-
-    const { access } = result
-    await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
-
+  bot.on('message:sticker', async (ctx) => {
     const sticker = ctx.message.sticker
     const emoji = sticker.emoji || ''
     const content = `(sticker: ${emoji})`
-    const meta = buildMeta(ctx)
-    meta.media_token = `sticker:${sticker.file_id}:${sticker.file_unique_id}`
-
-    const replyPrefix = extractReplyContext(ctx)
-    const fullContent = replyPrefix ? replyPrefix + content : content
-
-    mcp.notification({
-      method: 'notifications/claude/channel',
-      params: { content: fullContent, meta },
-    })
-
-    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
-    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-    await applyAck(ctx, access, deps)
+    const mediaToken = `sticker:${sticker.file_id}:${sticker.file_unique_id}`
+    await handleInbound(ctx, content, mediaToken, deps)
   })
 
   // ─── message_reaction ─────────────────────────────────────────────────────
-  bot.on('message_reaction', async (ctx: any) => {
+  bot.on('message_reaction', async (ctx) => {
     const reaction = ctx.messageReaction
     const newReactions = reaction.new_reaction ?? []
     const oldReactions = reaction.old_reaction ?? []
 
-    // Find added emojis (in new but not in old)
     const oldSet = new Set(oldReactions.map((r: any) => r.emoji))
     const added = newReactions.filter((r: any) => !oldSet.has(r.emoji))
-
     if (added.length === 0) return
 
-    // Gate check: verify chat is allowed
     const chatId = String(reaction.chat.id)
     const userId = String(reaction.user?.id ?? '')
 
-    const gateCtx = {
-      from: reaction.user,
-      chat: reaction.chat,
-      message: {},
-    }
-
+    const gateCtx = { from: reaction.user, chat: reaction.chat, message: {} }
     const result = runGate(gateCtx, deps)
     if (result.action !== 'deliver') return
-
-    const { access } = result
 
     for (const r of added) {
       const emoji = r.emoji
       const msgId = String(reaction.message_id)
       const cached = cache.get(chatId, msgId)
-
-      let content: string
-      if (cached) {
-        content = `[Reacted ${emoji} to: "${cached}"]`
-      } else {
-        content = `[Reacted ${emoji} to message #${msgId}]`
-      }
+      const content = cached
+        ? `[Reacted ${emoji} to: "${cached}"]`
+        : `[Reacted ${emoji} to message #${msgId}]`
 
       mcp.notification({
         method: 'notifications/claude/channel',
@@ -315,10 +132,10 @@ export function registerHandlers(deps: Deps): void {
   })
 
   // ─── callback_query:data ──────────────────────────────────────────────────
-  bot.on('callback_query:data', async (ctx: any) => {
+  bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
     const userId = String(ctx.from.id)
-    const chatId = String(ctx.chat.id)
+    const chatId = String(ctx.chat!.id)
 
     // Session switch callback
     if (data.startsWith('switch_')) {
@@ -335,20 +152,18 @@ export function registerHandlers(deps: Deps): void {
     }
 
     // Regular callback
-    const meta = {
-      chat_id: chatId,
-      message_id: ctx.callbackQuery.message?.message_id,
-      user: ctx.from.first_name ?? ctx.from.username ?? 'unknown',
-      user_id: userId,
-      ts: new Date((ctx.callbackQuery.message?.date ?? 0) * 1000).toISOString(),
-      reply_to_message_id: ctx.callbackQuery.message?.message_id,
-    }
-
     mcp.notification({
       method: 'notifications/claude/channel',
       params: {
         content: `[Button pressed: ${data}]`,
-        meta,
+        meta: {
+          chat_id: chatId,
+          message_id: String(ctx.callbackQuery.message?.message_id ?? ''),
+          user: ctx.from.first_name ?? ctx.from.username ?? 'unknown',
+          user_id: userId,
+          ts: new Date((ctx.callbackQuery.message?.date ?? 0) * 1000).toISOString(),
+          reply_to_message_id: String(ctx.callbackQuery.message?.message_id ?? ''),
+        },
       },
     })
 
@@ -356,7 +171,44 @@ export function registerHandlers(deps: Deps): void {
   })
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Shared inbound handler ──────────────────────────────────────────────────
+
+async function handleInbound(
+  ctx: any,
+  content: string,
+  mediaToken: string | undefined,
+  deps: Deps,
+): Promise<void> {
+  const { bot, mcp, cache, sessions } = deps
+
+  const result = runGate(ctx, deps)
+  if (result.action === 'drop') return
+  if (result.action === 'pair') {
+    await bot.api.sendMessage(String(ctx.chat.id), `Your pairing code is: ${result.code}`)
+    return
+  }
+
+  const { access } = result
+  await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
+
+  const replyPrefix = extractReplyContext(ctx)
+  const fullContent = replyPrefix ? replyPrefix + content : content
+
+  const meta = buildMeta(ctx)
+  if (mediaToken) meta.media_token = mediaToken
+
+  mcp.notification({
+    method: 'notifications/claude/channel',
+    params: { content: fullContent, meta },
+  })
+
+  cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+  sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
+
+  await applyAck(ctx, access, deps)
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function runGate(ctx: any, deps: Deps) {
   return deps.withAccessLock(() => {
@@ -395,7 +247,7 @@ function relativeAge(isoDate: string): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-function buildMeta(ctx: any): Record<string, any> {
+function buildMeta(ctx: any): Record<string, string> {
   return {
     chat_id: String(ctx.chat.id),
     message_id: String(ctx.message.message_id),
@@ -437,8 +289,8 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     if (!isUserAuthorized(userId, access)) return true
     const all = deps.sessions.getAll()
     const lines: string[] = []
-    for (const [id, session] of Object.entries(all)) {
-      const icon = session.active ? '\u{1F7E2}' : '\u{26AA}' // 🟢 / ⚪
+    for (const [, session] of Object.entries(all)) {
+      const icon = session.active ? '\u{1F7E2}' : '\u{26AA}'
       const age = relativeAge(session.startedAt)
       lines.push(`${icon} ${session.label} (${age})`)
     }
@@ -453,8 +305,8 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     const all = deps.sessions.getAll()
     const active = Object.entries(all).find(([, s]) => s.active)
     if (active) {
-      const [id, session] = active
-      await deps.bot.api.sendMessage(chatId, `Active session: ${session.label} [${id}]`)
+      const [, session] = active
+      await deps.bot.api.sendMessage(chatId, `Active: ${session.label}`)
     } else {
       await deps.bot.api.sendMessage(chatId, 'No active session')
     }
@@ -482,7 +334,6 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     if (ctx.chat.type !== 'private') return true
     const targetArg = parts.slice(1).join(' ').trim()
     if (targetArg) {
-      // Resolve by ID or label
       const all = deps.sessions.getAll()
       let targetId = targetArg
       if (!all[targetArg]) {
@@ -497,7 +348,6 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
       const label = all[targetId]?.label ?? targetId
       await deps.bot.api.sendMessage(chatId, `Switched to ${label}`)
     } else {
-      // No argument — show inline buttons for each session
       const all = deps.sessions.getAll()
       const entries = Object.entries(all)
       if (entries.length <= 1) {
