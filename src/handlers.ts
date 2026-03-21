@@ -328,7 +328,7 @@ export function registerHandlers(deps: Deps): void {
         return
       }
       const targetSessionId = data.slice('switch_'.length)
-      sessions.switchTo(targetSessionId, { immediate: true })
+      await sessions.switchTo(targetSessionId, { immediate: true })
       const label = sessions.getAll()[targetSessionId]?.label ?? targetSessionId
       await ctx.answerCallbackQuery({ text: `Switched to: ${label}` })
       return
@@ -493,7 +493,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
         await deps.bot.api.sendMessage(chatId, `Session not found: ${targetArg}`)
         return true
       }
-      deps.sessions.switchTo(targetId, { immediate: true })
+      await deps.sessions.switchTo(targetId, { immediate: true })
       const label = all[targetId]?.label ?? targetId
       await deps.bot.api.sendMessage(chatId, `Switched to ${label}`)
     } else {
@@ -522,7 +522,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const targetId = parts[1].slice('switch_'.length)
-    deps.sessions.switchTo(targetId, { immediate: true })
+    await deps.sessions.switchTo(targetId, { immediate: true })
     await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
     return true
   }

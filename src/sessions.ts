@@ -182,7 +182,7 @@ export function createSessionManager(opts: {
     watch(): void {
       if (watchInterval) return
 
-      const checkState = () => {
+      const checkState = async () => {
         const state = readState(stateDir)
 
         // Check for stale sessions and clean up under lock
@@ -210,13 +210,13 @@ export function createSessionManager(opts: {
           if (nowActive) {
             startPolling()
           } else {
-            stopPolling()
+            await stopPolling()
           }
         }
         wasActive = nowActive
       }
 
-      watchInterval = setInterval(checkState, 3000)
+      watchInterval = setInterval(() => void checkState(), 3000)
 
       // SIGUSR1 = immediate wake-up from switchTo() in another process
       process.on('SIGUSR1', checkState)
@@ -228,7 +228,7 @@ export function createSessionManager(opts: {
         watchInterval = null
       }
 
-      stopPolling()
+      void stopPolling()
 
       lockedOp((state) => {
         delete state.sessions[sessionId]
@@ -245,12 +245,13 @@ export function createSessionManager(opts: {
       }
     },
 
-    switchTo(targetId: string, opts?: { immediate?: boolean }): void {
+    async switchTo(targetId: string, opts?: { immediate?: boolean }): Promise<void> {
       // If this process is the active poller, stop polling BEFORE writing
       // the switch. This prevents a 409 race: Telegram rejects concurrent
       // getUpdates calls, and the old poller's grammY crashes on 409.
+      // bot.stop() takes ~3s (waits for pending getUpdates to complete).
       if (opts?.immediate && wasActive) {
-        stopPolling()
+        await stopPolling()
         wasActive = false
       }
 
@@ -263,14 +264,10 @@ export function createSessionManager(opts: {
         }
       })
 
-      // Signal the target process to wake up and start polling.
-      // Delay slightly to let bot.stop() cancel the pending getUpdates
-      // HTTP request — otherwise the target's bot.start() may trigger
-      // a 409 from Telegram (concurrent getUpdates on same token).
+      // Signal the target process to wake up and start polling immediately.
+      // Safe to do without delay because bot.stop() already completed above.
       if (targetPid && targetPid !== process.pid) {
-        setTimeout(() => {
-          try { process.kill(targetPid, 'SIGUSR1') } catch {}
-        }, 500)
+        try { process.kill(targetPid, 'SIGUSR1') } catch {}
       }
 
       // Notify allowFrom users

@@ -285,8 +285,8 @@ const startPolling = () => {
   void bot.start({ allowed_updates: ['message', 'message_reaction', 'callback_query'] })
   approvalTimer = startApprovalPoller({ stateDir, sendNotification })
 }
-const stopPolling = () => {
-  bot.stop()
+const stopPolling = async () => {
+  await bot.stop()
   if (approvalTimer) { stopApprovalPoller(approvalTimer); approvalTimer = null }
 }
 
