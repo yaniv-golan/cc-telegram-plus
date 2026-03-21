@@ -1109,7 +1109,7 @@ This is the wiring module — no separate tests (integration tested via the full
 2. **Load `.env`:** Read `${stateDir}/.env` manually (not in project root — can't use Bun's built-in `.env`). Parse `TELEGRAM_BOT_TOKEN` from `KEY=VALUE` lines. `OPENAI_API_KEY` is read from `process.env` (set by the user's shell, not the state dir `.env`) — this matches the spec
 3. Create grammy `Bot` with token
 4. Call `bot.api.getMe()` to get `botUsername`
-5. Create MCP `Server` with `experimental: { channels: true }` capability
+5. Create MCP `Server` with `experimental: { 'claude/channel': {} }` capability
 6. Register 4 tools in MCP (reply, react, edit_message, fetch_media) with JSON input schemas from spec
 7. Build session label: check `CLAUDE_IDE` env var → fall back to `"Claude Code"` → append ` — ${basename(cwd)}`
 8. Create access I/O from the tested `access-io.ts` module — do NOT recreate inline:

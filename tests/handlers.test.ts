@@ -49,7 +49,7 @@ describe('text handler', () => {
     expect(notifications[0].params.meta.chat_id).toBe('100')
     expect(notifications[0].params.meta.user_id).toBe('12345')
     expect(notifications[0].params.meta.user).toBe('testuser')
-    expect(notifications[0].params.meta.message_id).toBe(1)
+    expect(notifications[0].params.meta.message_id).toBe('1')
   })
 
   it('unknown user on allowlist policy emits no notification', async () => {

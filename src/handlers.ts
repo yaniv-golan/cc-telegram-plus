@@ -376,7 +376,7 @@ function extractReplyContext(ctx: any): string | null {
 function buildMeta(ctx: any): Record<string, any> {
   return {
     chat_id: String(ctx.chat.id),
-    message_id: ctx.message.message_id,
+    message_id: String(ctx.message.message_id),
     user: ctx.from?.first_name ?? ctx.from?.username ?? 'unknown',
     user_id: String(ctx.from?.id ?? ''),
     ts: new Date((ctx.message?.date ?? 0) * 1000).toISOString(),

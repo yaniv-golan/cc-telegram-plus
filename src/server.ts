@@ -16,13 +16,17 @@ import { handleToolCall } from './tools.ts'
 import { transcribeAudio } from './media.ts'
 import type { Deps } from './types.ts'
 
-// ─── 1. State dir ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE A — No network, no blocking. Get MCP handshake done ASAP.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── A1. State dir ───────────────────────────────────────────────────────────
 
 const stateDir = join(homedir(), '.claude', 'channels', 'telegram')
 mkdirSync(join(stateDir, 'inbox'), { recursive: true })
 mkdirSync(join(stateDir, 'approved'), { recursive: true })
 
-// ─── 2. Load .env ──────────────────────────────────────────────────────────────
+// ─── A2. Load .env ───────────────────────────────────────────────────────────
 
 let token: string | undefined
 try {
@@ -50,16 +54,11 @@ if (!token) {
   process.exit(1)
 }
 
-// ─── 3. Create Bot ─────────────────────────────────────────────────────────────
+// ─── A3. Create Bot (no network call) ────────────────────────────────────────
 
 const bot = new Bot(token)
 
-// ─── 4. Get bot username ───────────────────────────────────────────────────────
-
-const me = await bot.api.getMe()
-const botUsername = me.username
-
-// ─── 5. Create MCP Server ──────────────────────────────────────────────────────
+// ─── A4. Create MCP Server ───────────────────────────────────────────────────
 
 const INSTRUCTIONS = `The sender reads Telegram, not this session. Anything you want them to see must go through the reply tool — your transcript output never reaches their chat.
 
@@ -93,12 +92,12 @@ Access is managed by the /telegram:access skill — the user runs it in their te
 const mcp = new Server(
   { name: 'telegram', version: '0.1.0' },
   {
-    capabilities: { tools: {}, experimental: { channels: true } as any },
+    capabilities: { tools: {}, experimental: { 'claude/channel': {} } },
     instructions: INSTRUCTIONS,
   },
 )
 
-// ─── 6. Register MCP tool schemas ──────────────────────────────────────────────
+// ─── A5. Register MCP tool schemas ───────────────────────────────────────────
 
 mcp.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
@@ -212,22 +211,57 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => {
   }
 })
 
-// ─── 7. Build session label ────────────────────────────────────────────────────
+// ─── A6. Wire MCP tool calls (deps assigned in Phase B) ─────────────────────
 
-const ide = process.env.CLAUDE_IDE ?? 'Claude Code'
-const label = `${ide} — ${basename(process.cwd())}`
+let deps: Deps | null = null
 
-// ─── 8. Create access I/O ──────────────────────────────────────────────────────
+mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
+  if (!deps) {
+    return {
+      content: [{ type: 'text', text: 'Server still initializing' }],
+      isError: true,
+    }
+  }
+  return handleToolCall(
+    request.params.name,
+    request.params.arguments ?? {},
+    deps,
+  )
+})
+
+// ─── A7. Connect MCP transport ───────────────────────────────────────────────
+
+const transport = new StdioServerTransport()
+await mcp.connect(transport)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE B — MCP handshake complete. Network calls are now safe.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── B1. Get bot username ────────────────────────────────────────────────────
+
+const me = await bot.api.getMe()
+const botUsername = me.username
+
+// ─── B2. Create access I/O ───────────────────────────────────────────────────
 
 const { loadAccess, saveAccess, withAccessLock } = createAccessIO(stateDir)
 
-// ─── 9. Create transcribe closure ──────────────────────────────────────────────
+// ─── B3. Create transcribe closure ───────────────────────────────────────────
 
 const transcribe = process.env.OPENAI_API_KEY
   ? (buf: Buffer) => transcribeAudio(buf, process.env.OPENAI_API_KEY!)
   : undefined
 
-// ─── 10. Create SessionManager ─────────────────────────────────────────────────
+// ─── B4. Build session label ─────────────────────────────────────────────────
+
+const ide = process.env.CLAUDE_IDE ?? 'Claude Code'
+const projectDir = process.env.CLAUDE_PROJECT_DIR
+  ?? process.env.CWD
+  ?? process.cwd()
+const label = `${ide} — ${basename(projectDir)}`
+
+// ─── B5. Create SessionManager ───────────────────────────────────────────────
 
 let approvalTimer: NodeJS.Timeout | null = null
 const startPolling = () => {
@@ -257,14 +291,14 @@ const sessions = createSessionManager({
   label,
 })
 
-// ─── 11. Register session + create cache ───────────────────────────────────────
+// ─── B6. Register session + create cache ─────────────────────────────────────
 
 const sessionId = sessions.register()
 const cache = createCache(join(stateDir, `cache-${sessionId}.json`))
 
-// ─── 12. Build Deps ────────────────────────────────────────────────────────────
+// ─── B7. Build Deps ──────────────────────────────────────────────────────────
 
-const deps: Deps = {
+deps = {
   bot,
   mcp,
   cache,
@@ -277,21 +311,11 @@ const deps: Deps = {
   transcribe,
 }
 
-// ─── 13. Register handlers ─────────────────────────────────────────────────────
+// ─── B8. Register grammy handlers ────────────────────────────────────────────
 
 registerHandlers(deps)
 
-// ─── 14. Wire MCP tool calls ──────────────────────────────────────────────────
-
-mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
-  return handleToolCall(
-    request.params.name,
-    request.params.arguments ?? {},
-    deps,
-  )
-})
-
-// ─── 16. Set bot commands ──────────────────────────────────────────────────────
+// ─── B9. Set bot commands (fire-and-forget) ──────────────────────────────────
 
 void bot.api.setMyCommands(
   [
@@ -311,7 +335,7 @@ void bot.api.setMyCommands(
   { scope: { type: 'all_group_chats' } },
 )
 
-// ─── 17. Set bot description ───────────────────────────────────────────────────
+// ─── B10. Set bot description (fire-and-forget) ─────────────────────────────
 
 void bot.api.setMyDescription(
   'Enhanced Telegram channel for Claude Code. Supports all media types, voice transcription, session management, and more.',
@@ -320,20 +344,15 @@ void bot.api.setMyShortDescription(
   'Claude Code ↔ Telegram (enhanced)',
 )
 
-// ─── 18. Activate session + start watch ────────────────────────────────────────
+// ─── B11. Activate session + start polling ───────────────────────────────────
 
 sessions.activate()
 
-// ─── 19. Cache flush interval ──────────────────────────────────────────────────
+// ─── B12. Cache flush interval ───────────────────────────────────────────────
 
 setInterval(() => cache.flush(), 30_000)
 
-// ─── 20. Start MCP server ──────────────────────────────────────────────────────
-
-const transport = new StdioServerTransport()
-await mcp.connect(transport)
-
-// ─── 21. Signal handlers ──────────────────────────────────────────────────────
+// ─── B13. Signal handlers ────────────────────────────────────────────────────
 
 const cleanup = () => {
   cache.flush()
@@ -342,3 +361,14 @@ const cleanup = () => {
 process.on('SIGINT', cleanup)
 process.on('SIGTERM', cleanup)
 process.on('beforeExit', cleanup)
+
+// When CC closes the stdio pipe (session ends), exit cleanly.
+// Without this, bot.start() keeps the process alive as a zombie.
+process.stdin.on('end', () => {
+  cleanup()
+  process.exit(0)
+})
+mcp.onclose = () => {
+  cleanup()
+  process.exit(0)
+}

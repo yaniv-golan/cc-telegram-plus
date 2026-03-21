@@ -368,7 +368,7 @@ mcp.notification({
 })
 ```
 
-The MCP server declares `experimental: { channels: true }` in its capabilities during initialization.
+The MCP server declares `experimental: { 'claude/channel': {} }` in its capabilities during initialization (matching the official plugin's capability key).
 
 **Delivery failure:** If MCP notification delivery fails (e.g., agent disconnected), no ack reaction is applied — the Telegram user sees no visual indicator, which accurately reflects that Claude did not receive the message. This matches the official plugin's behavior (fire-and-forget notifications). There is no durable inbox or retry — the MCP SDK's notification method is fire-and-forget by design.
 
