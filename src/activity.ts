@@ -66,6 +66,7 @@ export function startActivityWatcher(opts: {
   let progressMessageIds: Record<string, number> = {} // chatId → msgId
   let permissionMessageIds: { chat_id: string; message_id: number }[] = [] // from hook
   let lastLabel = ''
+  let opChain: Promise<void> = Promise.resolve() // serializes send/edit/delete
 
   // Ensure file exists
   try { readFileSync(activityFile) } catch {
@@ -76,15 +77,17 @@ export function startActivityWatcher(opts: {
   try { lastSize = readFileSync(activityFile, 'utf8').length } catch {}
 
   function deleteProgressMessages() {
-    for (const [chatId, msgId] of Object.entries(progressMessageIds)) {
-      opts.bot.api.deleteMessage(chatId, msgId).catch(() => {})
-    }
-    for (const { chat_id, message_id } of permissionMessageIds) {
-      opts.bot.api.deleteMessage(chat_id, message_id).catch(() => {})
-    }
-    progressMessageIds = {}
-    permissionMessageIds = []
-    lastLabel = ''
+    opChain = opChain.then(async () => {
+      for (const [chatId, msgId] of Object.entries(progressMessageIds)) {
+        await opts.bot.api.deleteMessage(chatId, msgId).catch(() => {})
+      }
+      for (const { chat_id, message_id } of permissionMessageIds) {
+        await opts.bot.api.deleteMessage(chat_id, message_id).catch(() => {})
+      }
+      progressMessageIds = {}
+      permissionMessageIds = []
+      lastLabel = ''
+    })
   }
 
   const check = () => {
@@ -122,17 +125,20 @@ export function startActivityWatcher(opts: {
       lastLabel = label
 
       const chatIds = opts.getChatIds()
-      for (const chatId of chatIds) {
-        const existingMsgId = progressMessageIds[chatId]
-        if (existingMsgId) {
-          opts.bot.api.editMessageText(chatId, existingMsgId, label).catch(() => {})
-        } else {
-          opts.bot.api.sendMessage(chatId, label).then(
-            (sent) => { progressMessageIds[chatId] = sent.message_id },
-            () => {},
-          )
+      const capturedLabel = label
+      opChain = opChain.then(async () => {
+        for (const chatId of chatIds) {
+          const existingMsgId = progressMessageIds[chatId]
+          if (existingMsgId) {
+            await opts.bot.api.editMessageText(chatId, existingMsgId, capturedLabel).catch(() => {})
+          } else {
+            try {
+              const sent = await opts.bot.api.sendMessage(chatId, capturedLabel)
+              progressMessageIds[chatId] = sent.message_id
+            } catch {}
+          }
         }
-      }
+      })
     }
   }
 
