@@ -55,7 +55,7 @@ function writeState(stateDir: string, state: StateFile): void {
 
 function cleanStaleSessions(state: StateFile, opts?: {
   stateDir: string
-  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][], parseMode?: string) => Promise<void>
+  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][], parseMode?: string, pin?: boolean) => Promise<void>
   loadAccess: () => Access
 }): { cleaned: boolean; activeRemoved: boolean } {
   let cleaned = false
@@ -101,7 +101,7 @@ export function createSessionManager(opts: {
   stateDir: string
   startPolling: () => void
   stopPolling: () => void
-  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][], parseMode?: string) => Promise<void>
+  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][], parseMode?: string, pin?: boolean) => Promise<void>
   loadAccess: () => Access
   botUsername: string
   label: string
@@ -274,12 +274,12 @@ export function createSessionManager(opts: {
         try { process.kill(targetPid, 'SIGUSR1') } catch {}
       }
 
-      // Notify allowFrom users
+      // Notify allowFrom users and pin the status message
       const access = loadAccess()
       const targetSession = readState(stateDir).sessions[targetId]
       const targetLabel = targetSession?.label ?? targetId
       for (const chatId of access.allowFrom) {
-        sendNotification(chatId, `\u{1F7E2} <b>${targetLabel}</b>`, undefined, 'HTML').catch(() => {})
+        sendNotification(chatId, `\u{1F7E2} <b>${targetLabel}</b>`, undefined, 'HTML', true).catch(() => {})
       }
     },
 

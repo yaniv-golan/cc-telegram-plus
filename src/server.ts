@@ -290,11 +290,14 @@ const stopPolling = async () => {
   if (approvalTimer) { stopApprovalPoller(approvalTimer); approvalTimer = null }
 }
 
-const sendNotification = async (chatId: string, text: string, keyboard?: any, parseMode?: string) => {
-  await bot.api.sendMessage(chatId, text, {
+const sendNotification = async (chatId: string, text: string, keyboard?: any, parseMode?: string, pin?: boolean) => {
+  const sent = await bot.api.sendMessage(chatId, text, {
     ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {}),
     ...(parseMode ? { parse_mode: parseMode as any } : {}),
   })
+  if (pin) {
+    await bot.api.pinChatMessage(chatId, sent.message_id, { disable_notification: true }).catch(() => {})
+  }
 }
 
 const sessions = createSessionManager({
