@@ -173,6 +173,11 @@ export function createSessionManager(opts: {
       wasActive = active
       if (active) {
         startPolling()
+        // Pin active session status (replaces any stale pin from a dead session)
+        const access = loadAccess()
+        for (const chatId of access.allowFrom) {
+          sendNotification(chatId, `Active session: <b>${label}</b>`, undefined, 'HTML', true).catch(() => {})
+        }
       }
       manager.watch()
     },
