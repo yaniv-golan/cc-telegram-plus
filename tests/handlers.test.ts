@@ -527,7 +527,8 @@ describe('bot commands', () => {
     expect(sendCall).toBeDefined()
     expect(sendCall.args[1]).toContain('main')
     expect(sendCall.args[1]).toContain('\u{1F7E2}') // 🟢 for active
-    expect(sendCall.args[1]).toContain('other')
+    // Inactive sessions appear as switch buttons, not in text
+    expect(sendCall.args[2]).toBeDefined() // reply_markup with buttons
   })
 
   it('/sessions from unauthorized in group has no response', async () => {

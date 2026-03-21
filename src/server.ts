@@ -290,12 +290,11 @@ const stopPolling = async () => {
   if (approvalTimer) { stopApprovalPoller(approvalTimer); approvalTimer = null }
 }
 
-const sendNotification = async (chatId: string, text: string, keyboard?: any) => {
-  await bot.api.sendMessage(
-    chatId,
-    text,
-    keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {},
-  )
+const sendNotification = async (chatId: string, text: string, keyboard?: any, parseMode?: string) => {
+  await bot.api.sendMessage(chatId, text, {
+    ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {}),
+    ...(parseMode ? { parse_mode: parseMode as any } : {}),
+  })
 }
 
 const sessions = createSessionManager({

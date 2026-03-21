@@ -55,7 +55,7 @@ function writeState(stateDir: string, state: StateFile): void {
 
 function cleanStaleSessions(state: StateFile, opts?: {
   stateDir: string
-  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][]) => Promise<void>
+  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][], parseMode?: string) => Promise<void>
   loadAccess: () => Access
 }): { cleaned: boolean; activeRemoved: boolean } {
   let cleaned = false
@@ -101,7 +101,7 @@ export function createSessionManager(opts: {
   stateDir: string
   startPolling: () => void
   stopPolling: () => void
-  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][]) => Promise<void>
+  sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][], parseMode?: string) => Promise<void>
   loadAccess: () => Access
   botUsername: string
   label: string
@@ -158,8 +158,9 @@ export function createSessionManager(opts: {
         const shortLabel = label.includes(' \u{2014} ') ? label.split(' \u{2014} ')[1] : label
         for (const userId of access.allowFrom) {
           void sendNotification(userId,
-            `New session: ${label}\nActive: ${notifyNewSession.label}`,
-            [[{ text: `\u{1F504} ${shortLabel}`, callback_data: `switch_${sessionId}` }, { text: 'Keep', callback_data: 'switch_dismiss' }]]
+            `\u{1F7E2} <b>${notifyNewSession.label}</b>\n\u{26AA} <b>${label}</b> (new)`,
+            [[{ text: shortLabel, callback_data: `switch_${sessionId}` }, { text: 'Keep', callback_data: 'switch_dismiss' }]],
+            'HTML',
           )
         }
       }
@@ -278,7 +279,7 @@ export function createSessionManager(opts: {
       const targetSession = readState(stateDir).sessions[targetId]
       const targetLabel = targetSession?.label ?? targetId
       for (const chatId of access.allowFrom) {
-        sendNotification(chatId, `Switched active session to: ${targetLabel}`).catch(() => {})
+        sendNotification(chatId, `\u{1F7E2} <b>${targetLabel}</b>`, undefined, 'HTML').catch(() => {})
       }
     },
 

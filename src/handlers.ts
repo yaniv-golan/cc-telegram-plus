@@ -293,20 +293,16 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
       await deps.bot.api.sendMessage(chatId, 'No sessions')
       return true
     }
-    const lines: string[] = []
-    const buttons: { text: string; callback_data: string }[][] = []
-    for (const [id, session] of entries) {
-      const icon = session.active ? '\u{1F7E2}' : '\u{26AA}'
-      const age = relativeAge(session.startedAt)
-      lines.push(`${icon} ${session.label} (${age})`)
-      if (!session.active) {
-        buttons.push([{ text: `\u{1F504} ${session.label}`, callback_data: `switch_${id}` }])
-      }
-    }
+    const active = entries.find(([, s]) => s.active)
+    const activeLabel = active ? active[1].label : 'none'
+    const buttons = entries
+      .filter(([, s]) => !s.active)
+      .map(([id, s]) => [{ text: s.label, callback_data: `switch_${id}` }])
+    const header = `\u{1F7E2} ${activeLabel}`
     const opts = buttons.length > 0
       ? { reply_markup: { inline_keyboard: buttons } }
       : {}
-    await deps.bot.api.sendMessage(chatId, lines.join('\n'), opts)
+    await deps.bot.api.sendMessage(chatId, header, opts)
     return true
   }
 

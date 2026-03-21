@@ -386,8 +386,8 @@ describe('notifications', () => {
     const notifCalls = calls2.filter(c => c.method === 'sendNotification')
     expect(notifCalls.length).toBe(2)
     expect(notifCalls[0].args[0]).toBe('111')
-    expect(notifCalls[0].args[1]).toContain('New session: second')
-    expect(notifCalls[0].args[1]).toContain('Active: first')
+    expect(notifCalls[0].args[1]).toContain('second')
+    expect(notifCalls[0].args[1]).toContain('first')
     expect(notifCalls[1].args[0]).toBe('222')
   })
 
