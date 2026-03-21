@@ -122,7 +122,7 @@ export function createSessionManager(opts: {
 
   const manager: SessionManager = {
     register(): string {
-      sessionId = randomBytes(8).toString('hex')
+      sessionId = randomBytes(4).toString('hex')
 
       const notifyNewSession = lockedOp((state) => {
         // Clean stale before deciding active status
@@ -155,8 +155,8 @@ export function createSessionManager(opts: {
         const access = loadAccess()
         for (const userId of access.allowFrom) {
           void sendNotification(userId,
-            `New session started: ${label}\n\nCurrently active: ${notifyNewSession.label}`,
-            [[{ text: `Switch to ${label}`, callback_data: `switch_${sessionId}` }, { text: 'Keep current', callback_data: 'switch_dismiss' }]]
+            `New session: ${label}\nActive: ${notifyNewSession.label}`,
+            [[{ text: `\u{1F504} ${label}`, callback_data: `switch_${sessionId}` }, { text: 'Keep', callback_data: 'switch_dismiss' }]]
           )
         }
       }

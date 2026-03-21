@@ -255,11 +255,28 @@ const transcribe = process.env.OPENAI_API_KEY
 
 // ─── B4. Build session label ─────────────────────────────────────────────────
 
-const ide = process.env.CLAUDE_IDE ?? 'Claude Code'
-const projectDir = process.env.CLAUDE_PROJECT_DIR
+// Derive IDE name: CLAUDE_IDE > TERM_PROGRAM > entrypoint > fallback
+function deriveIde(): string {
+  if (process.env.CLAUDE_IDE) return process.env.CLAUDE_IDE
+  const term = process.env.TERM_PROGRAM?.toLowerCase() ?? ''
+  if (term === 'vscode') {
+    // Check if it's actually Cursor
+    const bundle = process.env.__CFBundleIdentifier ?? ''
+    if (bundle.includes('todesktop')) return 'Cursor'
+    return 'VS Code'
+  }
+  if (term.includes('cursor')) return 'Cursor'
+  if (term.includes('windsurf')) return 'Windsurf'
+  if (process.env.CLAUDE_CODE_ENTRYPOINT === 'cli') return 'CLI'
+  return 'Claude Code'
+}
+
+// Derive project name: OLDPWD is the dir CC was launched from
+const projectDir = process.env.OLDPWD
+  ?? process.env.CLAUDE_PROJECT_DIR
   ?? process.env.CWD
   ?? process.cwd()
-const label = `${ide} — ${basename(projectDir)}`
+const label = `${deriveIde()} — ${basename(projectDir)}`
 
 // ─── B5. Create SessionManager ───────────────────────────────────────────────
 

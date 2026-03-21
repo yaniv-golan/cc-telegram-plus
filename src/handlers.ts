@@ -373,6 +373,16 @@ function extractReplyContext(ctx: any): string | null {
   return `[Replying to: "${truncated}"]\n`
 }
 
+function relativeAge(isoDate: string): string {
+  const ms = Date.now() - new Date(isoDate).getTime()
+  const mins = Math.floor(ms / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 function buildMeta(ctx: any): Record<string, any> {
   return {
     chat_id: String(ctx.chat.id),
@@ -416,8 +426,9 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     const all = deps.sessions.getAll()
     const lines: string[] = []
     for (const [id, session] of Object.entries(all)) {
-      const marker = session.active ? ' (active)' : ''
-      lines.push(`- ${session.label}${marker} [${id}]`)
+      const icon = session.active ? '\u{1F7E2}' : '\u{26AA}' // 🟢 / ⚪
+      const age = relativeAge(session.startedAt)
+      lines.push(`${icon} ${session.label} (${age})`)
     }
     const msg = lines.length > 0 ? lines.join('\n') : 'No sessions'
     await deps.bot.api.sendMessage(chatId, msg)

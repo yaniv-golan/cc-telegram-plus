@@ -526,7 +526,7 @@ describe('bot commands', () => {
     const sendCall = botCalls.find(c => c.method === 'api.sendMessage')
     expect(sendCall).toBeDefined()
     expect(sendCall.args[1]).toContain('main')
-    expect(sendCall.args[1]).toContain('(active)')
+    expect(sendCall.args[1]).toContain('\u{1F7E2}') // 🟢 for active
     expect(sendCall.args[1]).toContain('other')
   })
 

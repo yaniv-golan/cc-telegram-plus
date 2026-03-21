@@ -79,7 +79,7 @@ describe('registration', () => {
     const mgr = createSessionManager(opts)
     const id = mgr.register()
 
-    expect(id).toMatch(/^[0-9a-f]{16}$/)
+    expect(id).toMatch(/^[0-9a-f]{8}$/)
   })
 
   it('session has instanceId field', () => {
@@ -386,8 +386,8 @@ describe('notifications', () => {
     const notifCalls = calls2.filter(c => c.method === 'sendNotification')
     expect(notifCalls.length).toBe(2)
     expect(notifCalls[0].args[0]).toBe('111')
-    expect(notifCalls[0].args[1]).toContain('New session started: second')
-    expect(notifCalls[0].args[1]).toContain('Currently active: first')
+    expect(notifCalls[0].args[1]).toContain('New session: second')
+    expect(notifCalls[0].args[1]).toContain('Active: first')
     expect(notifCalls[1].args[0]).toBe('222')
   })
 
