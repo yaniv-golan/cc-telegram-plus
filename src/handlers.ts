@@ -8,6 +8,18 @@ export function registerHandlers(deps: Deps): void {
   bot.on('message:text', async (ctx: any) => {
     const text: string = ctx.message.text
 
+    // ─── Reply to /name prompt ────────────────────────────────────────────────
+    const replyTo = ctx.message?.reply_to_message
+    if (replyTo?.from?.id === bot.botInfo?.id && replyTo?.text?.startsWith('Reply to this message with the new session name')) {
+      const userId = String(ctx.from.id)
+      const access = deps.withAccessLock(() => deps.loadAccess())
+      if (isUserAuthorized(userId, access)) {
+        deps.sessions.renameSession(text.trim())
+        await bot.api.sendMessage(String(ctx.chat.id), `Session renamed: ${text.trim()}`)
+      }
+      return
+    }
+
     // ─── Bot commands ────────────────────────────────────────────────────────
     if (text.startsWith('/')) {
       const handled = await handleCommand(ctx, deps)
@@ -454,7 +466,9 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     if (!isUserAuthorized(userId, access)) return true
     const newName = parts.slice(1).join(' ').trim()
     if (!newName) {
-      await deps.bot.api.sendMessage(chatId, 'Usage: /name <label>')
+      await deps.bot.api.sendMessage(chatId, 'Reply to this message with the new session name', {
+        reply_markup: { force_reply: true, selective: true, input_field_placeholder: 'Session name...' },
+      })
       return true
     }
     deps.sessions.renameSession(newName)
@@ -469,7 +483,25 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     const targetId = parts[1]
     if (targetId) {
       deps.sessions.switchTo(targetId)
-      await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
+      await deps.bot.api.sendMessage(chatId, `Switched to ${targetId}`)
+    } else {
+      // No argument — show inline buttons for each session
+      const all = deps.sessions.getAll()
+      const entries = Object.entries(all)
+      if (entries.length <= 1) {
+        await deps.bot.api.sendMessage(chatId, 'Only one session active')
+        return true
+      }
+      const buttons = entries
+        .filter(([, s]) => !s.active)
+        .map(([id, s]) => [{ text: `\u{1F504} ${s.label}`, callback_data: `switch_${id}` }])
+      if (buttons.length > 0) {
+        await deps.bot.api.sendMessage(chatId, 'Switch to:', {
+          reply_markup: { inline_keyboard: buttons },
+        })
+      } else {
+        await deps.bot.api.sendMessage(chatId, 'No other sessions to switch to')
+      }
     }
     return true
   }

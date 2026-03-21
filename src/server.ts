@@ -338,9 +338,7 @@ void bot.api.setMyCommands(
   [
     { command: 'sessions', description: 'List active sessions' },
     { command: 'status', description: 'Show current active session' },
-    { command: 'name', description: 'Rename the active session' },
     { command: 'chatid', description: 'Show this chat ID' },
-    { command: 'switch', description: 'Switch to another session' },
   ],
   { scope: { type: 'all_private_chats' } },
 )
