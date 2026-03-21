@@ -23,8 +23,8 @@ entry = {'ts': datetime.datetime.utcnow().isoformat() + 'Z', 'session_id': sessi
 
 if event in ('PreToolUse', 'PostToolUse'):
     tool = data.get('tool_name', '')
-    # Skip telegram MCP tools — they're outbound replies, not progress
-    if 'telegram' in tool.lower():
+    # Skip internal/noise tools and our own telegram tools
+    if 'telegram' in tool.lower() or tool in ('ToolSearch',):
         sys.exit(0)
     inp = data.get('tool_input', {})
 
