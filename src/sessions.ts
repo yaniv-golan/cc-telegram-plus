@@ -322,6 +322,13 @@ export function createSessionManager(opts: {
         state.lastInbound[chatId] = messageId
       })
     },
+
+    renameSession(newLabel: string): void {
+      lockedOp((state) => {
+        const session = state.sessions[sessionId]
+        if (session) session.label = newLabel
+      })
+    },
   }
 
   return manager

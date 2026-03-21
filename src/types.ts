@@ -69,6 +69,7 @@ export interface SessionManager {
   clearAckedMessages(chatId: string): number[]
   getLastInbound(chatId: string): string | undefined
   setLastInbound(chatId: string, messageId: string): void
+  renameSession(newLabel: string): void
 }
 
 export type Deps = {

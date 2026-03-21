@@ -449,6 +449,19 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     return true
   }
 
+  if (cmd === '/name') {
+    const access = deps.withAccessLock(() => deps.loadAccess())
+    if (!isUserAuthorized(userId, access)) return true
+    const newName = parts.slice(1).join(' ').trim()
+    if (!newName) {
+      await deps.bot.api.sendMessage(chatId, 'Usage: /name <label>')
+      return true
+    }
+    deps.sessions.renameSession(newName)
+    await deps.bot.api.sendMessage(chatId, `Session renamed: ${newName}`)
+    return true
+  }
+
   if (cmd === '/switch') {
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
