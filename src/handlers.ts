@@ -288,14 +288,25 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const all = deps.sessions.getAll()
+    const entries = Object.entries(all)
+    if (entries.length === 0) {
+      await deps.bot.api.sendMessage(chatId, 'No sessions')
+      return true
+    }
     const lines: string[] = []
-    for (const [, session] of Object.entries(all)) {
+    const buttons: { text: string; callback_data: string }[][] = []
+    for (const [id, session] of entries) {
       const icon = session.active ? '\u{1F7E2}' : '\u{26AA}'
       const age = relativeAge(session.startedAt)
       lines.push(`${icon} ${session.label} (${age})`)
+      if (!session.active) {
+        buttons.push([{ text: `\u{1F504} ${session.label}`, callback_data: `switch_${id}` }])
+      }
     }
-    const msg = lines.length > 0 ? lines.join('\n') : 'No sessions'
-    await deps.bot.api.sendMessage(chatId, msg)
+    const opts = buttons.length > 0
+      ? { reply_markup: { inline_keyboard: buttons } }
+      : {}
+    await deps.bot.api.sendMessage(chatId, lines.join('\n'), opts)
     return true
   }
 
