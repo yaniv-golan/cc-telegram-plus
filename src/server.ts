@@ -14,6 +14,7 @@ import { createAccessIO } from './access-io.ts'
 import { registerHandlers } from './handlers.ts'
 import { handleToolCall } from './tools.ts'
 import { transcribeAudio } from './media.ts'
+import { startActivityWatcher } from './activity.ts'
 import type { Deps } from './types.ts'
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -366,17 +367,31 @@ void bot.api.setMyShortDescription(
   'Claude Code ↔ Telegram (enhanced)',
 )
 
-// ─── B11. Activate session + start polling ───────────────────────────────────
+// ─── B11. Start activity watcher ─────────────────────────────────────────────
+
+const activityWatcher = startActivityWatcher({
+  stateDir,
+  bot,
+  getChatIds: () => {
+    const access = loadAccess()
+    return access.allowFrom
+  },
+  getSessionId: () => sessionId,
+  isActive: () => sessions.isActive(),
+})
+
+// ─── B12. Activate session + start polling ───────────────────────────────────
 
 sessions.activate()
 
-// ─── B12. Cache flush interval ───────────────────────────────────────────────
+// ─── B13. Cache flush interval ───────────────────────────────────────────────
 
 setInterval(() => cache.flush(), 30_000)
 
-// ─── B13. Signal handlers ────────────────────────────────────────────────────
+// ─── B14. Signal handlers ────────────────────────────────────────────────────
 
 const cleanup = () => {
+  activityWatcher.stop()
   cache.flush()
   sessions.stop()
 }
