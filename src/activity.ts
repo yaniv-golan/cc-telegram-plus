@@ -108,8 +108,10 @@ export function startActivityWatcher(opts: {
       let entry: ActivityEntry
       try { entry = JSON.parse(line) } catch { continue }
 
-      // Stop event — delete all progress and permission messages
+      // Stop event — delete progress messages after a grace period
+      // so the user can see the last tool call briefly
       if (entry.type === 'stop' || entry.type === 'subagent_stop') {
+        opChain = opChain.then(() => new Promise(r => setTimeout(r, 1500)))
         deleteProgressMessages()
         continue
       }
