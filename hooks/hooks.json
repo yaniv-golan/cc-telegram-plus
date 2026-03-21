@@ -55,8 +55,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/activity.sh",
-            "timeout": 5
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/notify-permission.sh",
+            "timeout": 10
           }
         ]
       }
