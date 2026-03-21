@@ -1,5 +1,8 @@
+<p align="center">
+  <img src="assets/banner.png" alt="cc-telegram-plus — Enhanced Telegram channel for Claude Code" width="100%">
+</p>
+
 # cc-telegram-plus
-Enhanced Telegram channel for Claude Code — drop-in replacement with more features
 
 A community-maintained Telegram channel plugin for Claude Code that extends the official plugin with all media types, voice transcription, reply context, emoji reactions, inline buttons, multi-session management, and a comprehensive test suite. Drop-in compatible — reads the same config files, exposes the same commands.
 
