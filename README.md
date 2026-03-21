@@ -121,6 +121,35 @@ messages at a time — no random delivery.
 - If the active session closes, another takes over automatically (~3s)
 - Switch takes ~3s (waits for Telegram long-poll to close cleanly)
 
+## Permissions and unattended use
+
+When Claude needs to run a command or edit a file that isn't pre-approved,
+it shows a permission prompt **in the terminal**. From Telegram, this looks
+like the bot is stuck. Claude will try to warn you before this happens.
+
+To reduce prompts, auto-approve common tools in `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Read", "Glob", "Grep", "LS",
+      "Bash(git:*)",
+      "mcp__plugin_telegram_telegram__reply",
+      "mcp__plugin_telegram_telegram__react",
+      "mcp__plugin_telegram_telegram__edit_message",
+      "mcp__plugin_telegram_telegram__fetch_media"
+    ]
+  }
+}
+```
+
+For fully unattended use in trusted environments:
+```bash
+claude --dangerously-load-development-channels plugin:telegram@local \
+  --dangerously-skip-permissions
+```
+
 ## Tool reference
 
 | Tool | Description |
