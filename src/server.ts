@@ -380,11 +380,10 @@ process.on('beforeExit', cleanup)
 
 // When CC closes the stdio pipe (session ends), exit cleanly.
 // Without this, bot.start() keeps the process alive as a zombie.
+// Only stdin 'end' means the CC session truly ended. mcp.onclose can
+// fire during CC internal operations (compaction, long tasks) — don't
+// exit on it, just log. CC may reconnect.
 process.stdin.on('end', () => {
   cleanup()
   process.exit(0)
 })
-mcp.onclose = () => {
-  cleanup()
-  process.exit(0)
-}
