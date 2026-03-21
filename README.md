@@ -20,6 +20,8 @@ A community-maintained Telegram channel plugin for Claude Code that extends the 
 | Switch between CC sessions | ✘ random delivery | ✔ managed switching |
 | See which session is active | ✘ | ✔ pinned status |
 | Ack reaction clears on reply | ✘ stays forever | ✔ auto-clears |
+| See what Claude is doing | ✘ | ✔ live tool progress |
+| Permission prompt alerts | ✘ | ✔ sent to Telegram |
 
 ## Requirements
 
