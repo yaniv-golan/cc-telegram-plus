@@ -161,8 +161,9 @@ claude --dangerously-load-development-channels plugin:telegram@local \
 
 ## Advanced configuration
 
-These optional fields in `~/.claude/channels/telegram/access.json` let
-you customize the bot's behavior:
+These optional fields in `~/.claude/channels/telegram/access.json`
+customize the bot's behavior. These are compatible with the official
+plugin — your config transfers if you switch between plugins.
 
 | Field | Default | Description |
 |---|---|---|
