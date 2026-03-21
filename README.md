@@ -5,20 +5,20 @@ A community-maintained Telegram channel plugin for Claude Code that extends the 
 
 ## Feature comparison
 
-| What you can do | Official Plugin | cc-telegram-plus |
-|---|---|---|
-| Send text messages | Yes | Yes |
-| Send photos | Yes | Yes |
-| Send documents, video, audio | No | Yes |
-| Send voice messages | No | Yes — auto-transcribed |
-| Send stickers | No | Yes |
-| Reply to a specific message | No context | Claude sees what you replied to |
-| React with emoji | No | Claude sees your reactions |
-| Claude sends inline buttons | No | Yes |
-| Claude sends reply keyboards | No | Yes |
-| Claude uses rich formatting | No | MarkdownV2 + HTML |
-| Switch between CC sessions | No — random delivery | Yes — managed, single active session |
-| See which session is active | No | Pinned status message |
+| What you can do | Official | cc-telegram-plus |
+|---|:---:|:---:|
+| Send text messages | ✔ | ✔ |
+| Send photos | ✔ | ✔ |
+| Send documents, video, audio | ✘ | ✔ |
+| Send voice messages | ✘ | ✔ auto-transcribed |
+| Send stickers | ✘ | ✔ |
+| Reply to a specific message | ✘ | ✔ Claude sees context |
+| React with emoji | ✘ | ✔ Claude sees reactions |
+| Claude sends inline buttons | ✘ | ✔ |
+| Claude sends reply keyboards | ✘ | ✔ |
+| Claude uses rich formatting | ✘ | ✔ MarkdownV2 + HTML |
+| Switch between CC sessions | ✘ random delivery | ✔ managed switching |
+| See which session is active | ✘ | ✔ pinned status |
 
 ## Requirements
 
