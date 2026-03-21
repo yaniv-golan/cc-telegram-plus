@@ -182,13 +182,13 @@ export function createSessionManager(opts: {
     watch(): void {
       if (watchInterval) return
 
-      watchInterval = setInterval(() => {
+      const checkState = () => {
         const state = readState(stateDir)
 
         // Check for stale sessions and clean up under lock
         let needsCleanup = false
         for (const [, session] of Object.entries(state.sessions)) {
-          if (!isProcessAlive(session.pid)) {
+          if (!isSessionAlive(session, stateDir)) {
             needsCleanup = true
             break
           }
@@ -214,7 +214,12 @@ export function createSessionManager(opts: {
           }
         }
         wasActive = nowActive
-      }, 3000)
+      }
+
+      watchInterval = setInterval(checkState, 3000)
+
+      // SIGUSR1 = immediate wake-up from switchTo() in another process
+      process.on('SIGUSR1', checkState)
     },
 
     stop(): void {
@@ -249,11 +254,20 @@ export function createSessionManager(opts: {
         wasActive = false
       }
 
+      let targetPid: number | null = null
+
       lockedOp((state) => {
         for (const [id, session] of Object.entries(state.sessions)) {
           session.active = id === targetId
+          if (id === targetId) targetPid = session.pid
         }
       })
+
+      // Signal the target process to wake up and start polling immediately
+      // instead of waiting up to 3s for its watcher tick.
+      if (targetPid && targetPid !== process.pid) {
+        try { process.kill(targetPid, 'SIGUSR1') } catch {}
+      }
 
       // Notify allowFrom users
       const access = loadAccess()
