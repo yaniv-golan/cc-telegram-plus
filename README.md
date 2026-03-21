@@ -5,21 +5,20 @@ A community-maintained Telegram channel plugin for Claude Code that extends the 
 
 ## Feature comparison
 
-| Feature | Official Plugin | cc-telegram-plus |
+| What you can do | Official Plugin | cc-telegram-plus |
 |---|---|---|
-| Text messages | Yes | Yes |
-| Photos | Yes (eager download) | Yes (lazy token) |
-| Documents, Video, Audio | No | Yes |
-| Voice messages | No | Yes (with transcription) |
-| Stickers | No | Yes |
-| Reply context | No | Yes |
-| Emoji reactions (inbound) | No | Yes |
-| Inline buttons | No | Yes |
-| Reply keyboards | No | Yes |
-| Session management | No | Yes |
-| Rich formatting | No | MarkdownV2 + HTML |
-| Ack reaction cleanup | No | Yes |
-| Test suite | No | 167 tests |
+| Send text messages | Yes | Yes |
+| Send photos | Yes | Yes |
+| Send documents, video, audio | No | Yes |
+| Send voice messages | No | Yes — auto-transcribed |
+| Send stickers | No | Yes |
+| Reply to a specific message | No context | Claude sees what you replied to |
+| React with emoji | No | Claude sees your reactions |
+| Claude sends inline buttons | No | Yes |
+| Claude sends reply keyboards | No | Yes |
+| Claude uses rich formatting | No | MarkdownV2 + HTML |
+| Switch between CC sessions | No — random delivery | Yes — managed, single active session |
+| See which session is active | No | Pinned status message |
 
 ## Requirements
 
@@ -91,11 +90,13 @@ Or select "Yes, and don't ask again" when prompted during a session.
 
 Your existing `.env` and `access.json` transfer automatically. cc-telegram-plus adds optional fields (`ackReaction`, `replyToMode`, etc.) that the official plugin ignores. Caveat: if you switch back, the official plugin may strip these additive fields when it rewrites `access.json`. Back up first.
 
-## New features guide
+## Usage tips
 
-- **Media:** All types arrive with a `media_token`. Agent calls `fetch_media` to download on demand.
-- **Voice:** Automatically transcribed (requires `OPENAI_API_KEY` env var). Falls back to token-only if not set.
-- **Keyboards:** Agent can send `reply_keyboard` for structured input, `inline_keyboard` for action buttons.
+- **Photos, docs, video, audio:** Just send them. Claude sees a description and can download the file on demand if it needs the content.
+- **Voice messages:** Automatically transcribed to text (requires `OPENAI_API_KEY` env var). Claude sees the transcript directly.
+- **Reply to a message:** Claude sees the quoted message for context.
+- **React with emoji:** Claude sees your reaction as lightweight feedback.
+- **Rich replies:** Claude can send formatted text, inline buttons, and reply keyboards.
 
 ## Session management
 
