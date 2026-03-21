@@ -263,10 +263,14 @@ export function createSessionManager(opts: {
         }
       })
 
-      // Signal the target process to wake up and start polling immediately
-      // instead of waiting up to 3s for its watcher tick.
+      // Signal the target process to wake up and start polling.
+      // Delay slightly to let bot.stop() cancel the pending getUpdates
+      // HTTP request — otherwise the target's bot.start() may trigger
+      // a 409 from Telegram (concurrent getUpdates on same token).
       if (targetPid && targetPid !== process.pid) {
-        try { process.kill(targetPid, 'SIGUSR1') } catch {}
+        setTimeout(() => {
+          try { process.kill(targetPid, 'SIGUSR1') } catch {}
+        }, 500)
       }
 
       // Notify allowFrom users
