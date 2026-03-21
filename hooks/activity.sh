@@ -5,50 +5,65 @@
 
 ACTIVITY_FILE="$HOME/.claude/channels/telegram/activity.jsonl"
 
-# Read stdin (CC passes hook data as JSON)
+# Read all of stdin
 INPUT=$(cat)
 
-# Extract fields using python3 (available on macOS/Linux)
 python3 -c "
-import json, sys, os
+import json, sys, os, datetime
+
 try:
-    data = json.loads('''$INPUT''')
+    data = json.loads(sys.stdin.read()) if not '''$INPUT''' else json.loads('''$INPUT''')
 except:
-    # Fallback: read from original stdin data
-    try:
-        data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
-    except:
-        sys.exit(0)
+    sys.exit(0)
 
 event = data.get('hook_event_name', '')
 session_id = data.get('session_id', '')
 
-entry = {'ts': __import__('datetime').datetime.utcnow().isoformat() + 'Z', 'session_id': session_id}
+entry = {'ts': datetime.datetime.utcnow().isoformat() + 'Z', 'session_id': session_id}
 
 if event == 'PostToolUse':
     tool = data.get('tool_name', '')
-    # Skip our own telegram tools — they're outbound, not progress
-    if tool.startswith('mcp__plugin_telegram') or tool.startswith('mcp__telegram'):
+    # Skip telegram MCP tools — they're outbound replies, not progress
+    if 'telegram' in tool.lower():
         sys.exit(0)
-    detail = ''
     inp = data.get('tool_input', {})
+
+    # Extract maximum useful detail for developers
     if tool == 'Read':
-        detail = inp.get('file_path', '').split('/')[-1]
-    elif tool == 'Edit' or tool == 'Write':
-        detail = inp.get('file_path', '').split('/')[-1]
+        path = inp.get('file_path', '')
+        # Show relative path if possible
+        detail = path.split('/')[-2] + '/' + path.split('/')[-1] if '/' in path else path
+        if inp.get('offset'):
+            detail += f' L{inp[\"offset\"]}'
+    elif tool in ('Edit', 'Write'):
+        path = inp.get('file_path', '')
+        detail = path.split('/')[-2] + '/' + path.split('/')[-1] if '/' in path else path
     elif tool == 'Bash':
-        cmd = inp.get('command', '')
-        detail = inp.get('description', '') or cmd[:40]
+        # Show description if available, otherwise first 60 chars of command
+        detail = inp.get('description', '') or inp.get('command', '')[:60]
     elif tool == 'Grep':
-        detail = inp.get('pattern', '')[:30]
+        pat = inp.get('pattern', '')[:30]
+        path = inp.get('path', '').split('/')[-1] if inp.get('path') else ''
+        detail = f'\"{pat}\"' + (f' in {path}' if path else '')
     elif tool == 'Glob':
-        detail = inp.get('pattern', '')[:30]
+        detail = inp.get('pattern', '')
     elif tool == 'Agent':
-        detail = inp.get('description', '')[:40]
-    elif tool.startswith('mcp__'):
-        detail = tool.split('__')[-1]
+        detail = inp.get('description', '')[:50]
+    elif tool == 'WebSearch':
+        detail = inp.get('query', '')[:50]
+    elif tool == 'WebFetch':
+        url = inp.get('url', '')
+        # Show just the domain
+        try:
+            from urllib.parse import urlparse
+            detail = urlparse(url).netloc
+        except:
+            detail = url[:40]
+    elif tool == 'LS':
+        detail = inp.get('path', '').split('/')[-1] if inp.get('path') else '.'
     else:
         detail = ''
+
     entry['type'] = 'tool'
     entry['tool'] = tool
     entry['detail'] = detail

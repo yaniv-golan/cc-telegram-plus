@@ -331,6 +331,7 @@ deps = {
   stateDir,
   botUsername,
   transcribe,
+  // clearProgress is set after activityWatcher is created (below)
 }
 
 // ─── B8. Register grammy handlers ────────────────────────────────────────────
@@ -378,6 +379,8 @@ const activityWatcher = startActivityWatcher({
   },
   isActive: () => sessions.isActive(),
 })
+
+deps.clearProgress = () => activityWatcher.clearProgress()
 
 // ─── B12. Activate session + start polling ───────────────────────────────────
 

@@ -83,4 +83,5 @@ export type Deps = {
   stateDir: string
   botUsername: string
   transcribe?: (buf: Buffer) => Promise<string>
+  clearProgress?: () => void
 }

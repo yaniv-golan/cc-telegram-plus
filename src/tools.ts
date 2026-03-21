@@ -45,6 +45,9 @@ export async function handleToolCall(
 // ─── reply ───────────────────────────────────────────────────────────────────
 
 async function handleReply(args: Record<string, any>, deps: Deps): Promise<ToolResult> {
+  // Clear progress indicator before sending the reply
+  deps.clearProgress?.()
+
   const {
     chat_id,
     text,

@@ -1,4 +1,4 @@
-import { watchFile, unwatchFile, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Bot } from 'grammy'
 
@@ -12,23 +12,38 @@ type ActivityEntry = {
   message?: string
 }
 
-const TOOL_LABELS: Record<string, string> = {
-  Read: 'Reading',
-  Edit: 'Editing',
-  Write: 'Writing',
-  Bash: 'Running',
-  Grep: 'Searching',
-  Glob: 'Finding files',
-  Agent: 'Subagent',
-  WebSearch: 'Searching web',
-  WebFetch: 'Fetching',
-}
-
 function formatEntry(entry: ActivityEntry): string | null {
   if (entry.type === 'tool') {
-    const verb = TOOL_LABELS[entry.tool ?? ''] ?? entry.tool ?? 'Working'
-    const detail = entry.detail ? `: ${entry.detail}` : ''
-    return `\u{1F504} ${verb}${detail}`
+    const tool = entry.tool ?? ''
+    const detail = entry.detail ?? ''
+
+    // Developer-friendly labels with as much context as possible
+    switch (tool) {
+      case 'Read':
+        return `\u{1F4C4} Read ${detail}`
+      case 'Edit':
+        return `\u{270F}\u{FE0F} Edit ${detail}`
+      case 'Write':
+        return `\u{1F4DD} Write ${detail}`
+      case 'Bash':
+        return `\u{1F4BB} $ ${detail}`
+      case 'Grep':
+        return `\u{1F50D} grep ${detail}`
+      case 'Glob':
+        return `\u{1F50D} glob ${detail}`
+      case 'Agent':
+        return `\u{1F916} Agent: ${detail}`
+      case 'WebSearch':
+        return `\u{1F310} Search: ${detail}`
+      case 'WebFetch':
+        return `\u{1F310} Fetch: ${detail}`
+      case 'LS':
+        return `\u{1F4C2} ls ${detail}`
+      case 'ToolSearch':
+        return `\u{1F50D} ToolSearch`
+      default:
+        return `\u{1F527} ${tool}${detail ? ': ' + detail : ''}`
+    }
   }
   if (entry.type === 'subagent_start') {
     return `\u{1F916} Subagent: ${entry.agent_type ?? 'working'}...`
@@ -44,7 +59,7 @@ export function startActivityWatcher(opts: {
   bot: Bot
   getChatIds: () => string[]
   isActive: () => boolean
-}): { stop: () => void } {
+}): { stop: () => void; clearProgress: () => void } {
   const activityFile = join(opts.stateDir, 'activity.jsonl')
   let lastSize = 0
   let progressMessageIds: Record<string, number> = {} // chatId → msgId
@@ -53,6 +68,17 @@ export function startActivityWatcher(opts: {
   // Ensure file exists
   try { readFileSync(activityFile) } catch {
     writeFileSync(activityFile, '')
+  }
+
+  // Skip to end of file on startup (don't replay old events)
+  try { lastSize = readFileSync(activityFile, 'utf8').length } catch {}
+
+  function deleteProgressMessages() {
+    for (const [chatId, msgId] of Object.entries(progressMessageIds)) {
+      opts.bot.api.deleteMessage(chatId, msgId).catch(() => {})
+    }
+    progressMessageIds = {}
+    lastLabel = ''
   }
 
   const check = () => {
@@ -73,15 +99,9 @@ export function startActivityWatcher(opts: {
       let entry: ActivityEntry
       try { entry = JSON.parse(line) } catch { continue }
 
-      // Only the active session processes events (checked via isActive above)
-
       // Stop event — delete progress message
       if (entry.type === 'stop' || entry.type === 'subagent_stop') {
-        for (const [chatId, msgId] of Object.entries(progressMessageIds)) {
-          opts.bot.api.deleteMessage(chatId, msgId).catch(() => {})
-        }
-        progressMessageIds = {}
-        lastLabel = ''
+        deleteProgressMessages()
         continue
       }
 
@@ -93,10 +113,8 @@ export function startActivityWatcher(opts: {
       for (const chatId of chatIds) {
         const existingMsgId = progressMessageIds[chatId]
         if (existingMsgId) {
-          // Edit existing progress message
           opts.bot.api.editMessageText(chatId, existingMsgId, label).catch(() => {})
         } else {
-          // Send new progress message
           opts.bot.api.sendMessage(chatId, label).then(
             (sent) => { progressMessageIds[chatId] = sent.message_id },
             () => {},
@@ -106,17 +124,16 @@ export function startActivityWatcher(opts: {
     }
   }
 
-  // Poll the file every 500ms (fs.watch is unreliable on macOS)
   const interval = setInterval(check, 500)
 
   return {
     stop: () => {
       clearInterval(interval)
-      // Clean up progress messages
-      for (const [chatId, msgId] of Object.entries(progressMessageIds)) {
-        opts.bot.api.deleteMessage(chatId, msgId).catch(() => {})
-      }
-      progressMessageIds = {}
+      deleteProgressMessages()
+    },
+    // Called by the reply tool to clear progress before sending the reply
+    clearProgress: () => {
+      deleteProgressMessages()
     },
   }
 }
