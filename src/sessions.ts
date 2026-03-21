@@ -207,11 +207,6 @@ export function createSessionManager(opts: {
 
         const nowActive = mySession.active
         if (wasActive !== null && nowActive !== wasActive) {
-          try {
-            const { appendFileSync } = require('node:fs')
-            appendFileSync('/tmp/cc-telegram-state.log',
-              `${new Date().toISOString()} pid=${process.pid} sid=${sessionId} was=${wasActive} now=${nowActive}\n`)
-          } catch {}
           if (nowActive) {
             startPolling()
           } else {
