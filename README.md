@@ -59,13 +59,28 @@ check. Use only `--dangerously-load-development-channels` for this plugin.
 On first launch with the development flag, CC will show a warning and ask
 you to confirm. Select "I am using this for local development" to proceed.
 
-**Without `--channels`, the MCP tools will load but inbound Telegram
+**Without the channels flag, the MCP tools will load but inbound Telegram
 messages will not be delivered to Claude.**
+
+### Auto-approve reply tools (optional)
+
+By default, Claude asks for permission each time it sends a Telegram
+message. To auto-approve, add the tools to your global settings:
+
+Add to `~/.claude/settings.json` under `permissions.allow`:
+```json
+"mcp__plugin_telegram_telegram__reply",
+"mcp__plugin_telegram_telegram__react",
+"mcp__plugin_telegram_telegram__edit_message",
+"mcp__plugin_telegram_telegram__fetch_media"
+```
+
+Or select "Yes, and don't ask again" when prompted during a session.
 
 ## Setup (new users)
 
 1. Create a bot via @BotFather on Telegram
-2. Start Claude Code with `--channels` (see above)
+2. Start Claude Code with the channels flag (see above)
 3. Run `/telegram:configure <token>` in Claude Code
 4. Restart Claude Code (with `--channels`) to load the bot token
 5. Message your bot on Telegram — it will prompt for pairing
