@@ -95,8 +95,30 @@ Your existing `.env` and `access.json` transfer automatically. cc-telegram-plus 
 
 - **Media:** All types arrive with a `media_token`. Agent calls `fetch_media` to download on demand.
 - **Voice:** Automatically transcribed (requires `OPENAI_API_KEY` env var). Falls back to token-only if not set.
-- **Sessions:** Multiple Claude Code instances share one bot. `/sessions` to see, `/switch` to change. Only one session receives messages at a time.
 - **Keyboards:** Agent can send `reply_keyboard` for structured input, `inline_keyboard` for action buttons.
+
+## Session management
+
+Multiple Claude Code instances share one bot. Only one session receives
+messages at a time — no random delivery.
+
+**Bot commands:**
+
+| Command | Description |
+|---|---|
+| `/sessions` | Show active session + switch buttons for others |
+| `/switch` | Show switch buttons (or `/switch <name>` to switch directly) |
+| `/name <label>` | Rename the active session (or tap for a prompt) |
+| `/status` | Show which session is active |
+| `/chatid` | Show this chat's ID |
+
+**How it works:**
+- The first session to start becomes active and polls Telegram
+- When a new session starts, you get a notification with a switch button
+- Switching pins an "Active session: **name**" message to the chat
+- Renaming also updates the pinned message
+- If the active session closes, another takes over automatically (~3s)
+- Switch takes ~3s (waits for Telegram long-poll to close cleanly)
 
 ## Tool reference
 
