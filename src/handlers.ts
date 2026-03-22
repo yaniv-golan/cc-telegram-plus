@@ -16,6 +16,7 @@ export function registerHandlers(deps: Deps): void {
     // Reply to /name prompt
     const replyTo = ctx.message?.reply_to_message
     if (replyTo?.from?.id === bot.botInfo?.id && replyTo?.text?.startsWith('Reply to this message with the new session name')) {
+      if (ctx.chat?.type !== 'private') return
       const userId = String(ctx.from.id)
       const access = deps.withAccessLock(() => deps.loadAccess())
       if (isUserAuthorized(userId, access)) {
@@ -378,6 +379,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/sessions') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const all = deps.sessions.getAll()
@@ -402,6 +404,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/status') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const all = deps.sessions.getAll()
@@ -416,6 +419,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/name') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const newName = parts.slice(1).join(' ').trim()
@@ -433,9 +437,9 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/switch') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
-    if (ctx.chat.type !== 'private') return true
     const targetArg = parts.slice(1).join(' ').trim()
     if (targetArg) {
       const all = deps.sessions.getAll()
