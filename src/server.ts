@@ -367,6 +367,8 @@ registerHandlers(deps)
 
 void bot.api.setMyCommands(
   [
+    { command: 'start', description: 'Welcome and pairing instructions' },
+    { command: 'help', description: 'What this bot can do' },
     { command: 'sessions', description: 'List active sessions' },
     { command: 'switch', description: 'Switch to another session' },
     { command: 'name', description: 'Rename the active session' },
@@ -374,7 +376,7 @@ void bot.api.setMyCommands(
     { command: 'chatid', description: 'Show this chat ID' },
   ],
   { scope: { type: 'all_private_chats' } },
-)
+).catch(() => {})
 
 void bot.api.setMyCommands(
   [

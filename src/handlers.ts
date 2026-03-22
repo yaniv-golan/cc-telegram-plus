@@ -472,12 +472,39 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     return true
   }
 
-  if (cmd === '/start' && parts[1]?.startsWith('switch_')) {
-    const access = deps.withAccessLock(() => deps.loadAccess())
-    if (!isUserAuthorized(userId, access)) return true
-    const targetId = parts[1].slice('switch_'.length)
-    await deps.sessions.switchTo(targetId, { immediate: true })
-    await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
+  if (cmd === '/start') {
+    // Deep-link: /start switch_<id> for session switching
+    if (parts[1]?.startsWith('switch_')) {
+      const access = deps.withAccessLock(() => deps.loadAccess())
+      if (!isUserAuthorized(userId, access)) return true
+      const targetId = parts[1].slice('switch_'.length)
+      await deps.sessions.switchTo(targetId, { immediate: true })
+      await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
+      return true
+    }
+    // Bare /start: onboarding (DM only)
+    if (ctx.chat?.type !== 'private') return true
+    await deps.bot.api.sendMessage(chatId,
+      `This bot bridges Telegram to a Claude Code session.\n\n` +
+      `To pair:\n` +
+      `1. DM me anything — you'll get a 6-char code\n` +
+      `2. In Claude Code: /telegram:access pair <code>\n\n` +
+      `After that, DMs here reach that session.`
+    )
+    return true
+  }
+
+  if (cmd === '/help') {
+    if (ctx.chat?.type !== 'private') return true
+    await deps.bot.api.sendMessage(chatId,
+      `Messages you send here route to a paired Claude Code session. ` +
+      `Text, photos, documents, and voice messages are forwarded; replies and reactions come back.\n\n` +
+      `/start — pairing instructions\n` +
+      `/sessions — list active sessions\n` +
+      `/switch — switch to another session\n` +
+      `/status — show current active session\n` +
+      `/chatid — show this chat's ID`
+    )
     return true
   }
 
