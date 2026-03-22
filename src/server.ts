@@ -320,35 +320,39 @@ const startPolling = () => {
   pollingAbort = () => { cancelled = true }
 
   void (async () => {
-    for (let attempt = 1; ; attempt++) {
-      if (cancelled || !sessions.isActive()) return
-
-      try {
-        await bot.start({ allowed_updates: ['message', 'message_reaction', 'callback_query'] })
-        return // bot.stop() was called — clean exit
-      } catch (err) {
+    try {
+      for (let attempt = 1; ; attempt++) {
         if (cancelled || !sessions.isActive()) return
 
-        // Expected: bot.stop() during setup
-        if (err instanceof Error && err.message === 'Aborted delay') return
+        try {
+          await bot.start({ allowed_updates: ['message', 'message_reaction', 'callback_query'] })
+          return // bot.stop() was called — clean exit
+        } catch (err) {
+          if (cancelled || !sessions.isActive()) return
 
-        // 409 Conflict: another poller is active (zombie or external)
-        if (err instanceof GrammyError && err.error_code === 409) {
-          const delay = Math.min(1000 * attempt, 15000)
-          const detail = attempt === 1
-            ? ' — another instance is polling (zombie session?)'
-            : ''
-          process.stderr.write(
-            `telegram channel: 409 Conflict${detail}, retrying in ${delay / 1000}s\n`,
-          )
-          await new Promise(r => setTimeout(r, delay))
-          continue
+          // Expected: bot.stop() during setup
+          if (err instanceof Error && err.message === 'Aborted delay') return
+
+          // 409 Conflict: another poller is active (zombie or external)
+          if (err instanceof GrammyError && err.error_code === 409) {
+            const delay = Math.min(1000 * attempt, 15000)
+            const detail = attempt === 1
+              ? ' — another instance is polling (zombie session?)'
+              : ''
+            process.stderr.write(
+              `telegram channel: 409 Conflict${detail}, retrying in ${delay / 1000}s\n`,
+            )
+            await new Promise(r => setTimeout(r, delay))
+            continue
+          }
+
+          // Unexpected error — exit so session failover can promote another session
+          process.stderr.write(`telegram channel: polling failed: ${err}\n`)
+          process.exit(1)
         }
-
-        // Unexpected error — exit so session failover can promote another session
-        process.stderr.write(`telegram channel: polling failed: ${err}\n`)
-        process.exit(1)
       }
+    } finally {
+      pollingActive = false
     }
   })()
 }

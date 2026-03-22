@@ -188,14 +188,14 @@ export function registerHandlers(deps: Deps): void {
 
     // Session switch callback
     if (data.startsWith('switch_')) {
-      // "Keep" button sends switch_dismiss — just acknowledge
-      if (data === 'switch_dismiss') {
-        await ctx.answerCallbackQuery({ text: 'Kept current session' })
-        return
-      }
       const access = deps.withAccessLock(() => deps.loadAccess())
       if (!isUserAuthorized(userId, access)) {
         await ctx.answerCallbackQuery({ text: 'Not authorized' })
+        return
+      }
+      // "Keep" button sends switch_dismiss — just acknowledge
+      if (data === 'switch_dismiss') {
+        await ctx.answerCallbackQuery({ text: 'Kept current session' })
         return
       }
       const targetSessionId = data.slice('switch_'.length)
