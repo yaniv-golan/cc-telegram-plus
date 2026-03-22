@@ -188,14 +188,25 @@ export function registerHandlers(deps: Deps): void {
 
     // Session switch callback
     if (data.startsWith('switch_')) {
+      // "Keep" button sends switch_dismiss — just acknowledge
+      if (data === 'switch_dismiss') {
+        await ctx.answerCallbackQuery({ text: 'Kept current session' })
+        return
+      }
       const access = deps.withAccessLock(() => deps.loadAccess())
       if (!isUserAuthorized(userId, access)) {
         await ctx.answerCallbackQuery({ text: 'Not authorized' })
         return
       }
       const targetSessionId = data.slice('switch_'.length)
+      // Validate target exists before switching
+      const all = sessions.getAll()
+      if (!all[targetSessionId]) {
+        await ctx.answerCallbackQuery({ text: 'Session not found' })
+        return
+      }
       await sessions.switchTo(targetSessionId, { immediate: true })
-      const label = sessions.getAll()[targetSessionId]?.label ?? targetSessionId
+      const label = all[targetSessionId]?.label ?? targetSessionId
       await ctx.answerCallbackQuery({ text: `Switched to: ${label}` })
       return
     }
@@ -494,8 +505,13 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
       const access = deps.withAccessLock(() => deps.loadAccess())
       if (!isUserAuthorized(userId, access)) return true
       const targetId = parts[1].slice('switch_'.length)
+      const all = deps.sessions.getAll()
+      if (!all[targetId]) {
+        await deps.bot.api.sendMessage(chatId, `Session not found: ${targetId}`)
+        return true
+      }
       await deps.sessions.switchTo(targetId, { immediate: true })
-      await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
+      await deps.bot.api.sendMessage(chatId, `Switching to ${all[targetId]?.label ?? targetId}`)
       return true
     }
     const access = deps.withAccessLock(() => deps.loadAccess())

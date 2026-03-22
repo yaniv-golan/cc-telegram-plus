@@ -391,6 +391,7 @@ describe('callback handler', () => {
       sessions: {
         ...deps.sessions,
         switchTo: (id: string) => { switchToCalls.push(id) },
+        getAll: () => ({ abc123: { label: 'test', active: false, pid: 1, instanceId: 'x', startedAt: '' } as any }),
       },
     })
     registerHandlers(deps)
@@ -658,6 +659,7 @@ describe('bot commands', () => {
       sessions: {
         ...deps.sessions,
         switchTo: (id: string) => { switchToCalls.push(id) },
+        getAll: () => ({ abc456: { label: 'test', active: false, pid: 1, instanceId: 'x', startedAt: '' } as any }),
       },
     })
     registerHandlers(deps)

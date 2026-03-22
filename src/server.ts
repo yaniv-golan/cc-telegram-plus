@@ -482,10 +482,12 @@ const cleanup = () => {
   activityWatcher.stop()
   cache.flush()
   permissionRelay.cleanup()
+
+  // Clean up ask files if we're the active poller (check before stop() removes us)
+  const wasActive = sessions.isActive()
   sessions.stop()
 
-  // Clean up ask files if we're the active poller
-  if (sessions.isActive()) {
+  if (wasActive) {
     try { unlinkSync(join(stateDir, 'ask-pending.json')) } catch {}
     try { unlinkSync(join(stateDir, 'ask-reply.json')) } catch {}
   }
