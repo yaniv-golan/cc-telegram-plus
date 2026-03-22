@@ -1,5 +1,6 @@
 import type { Deps } from './types.ts'
 import { gate, pruneExpired, isUserAuthorized } from './gate.ts'
+import { readAskPending, writeAskReply, deleteAskPending } from './ask-io.ts'
 
 export function registerHandlers(deps: Deps): void {
   const { bot, mcp, cache, sessions } = deps
@@ -141,6 +142,45 @@ export function registerHandlers(deps: Deps): void {
     const userId = String(ctx.from.id)
     const chatId = String(ctx.chat!.id)
 
+    // Ask-user redirect: route callback to reply file
+    if (data.startsWith('ask_answer_')) {
+      const pending = readAskPending(deps.stateDir)
+      if (pending) {
+        // Validate callback is from the correct message/chat (prevents stale buttons)
+        const cbMsgId = ctx.callbackQuery.message?.message_id
+        if (chatId !== pending.chatId || (cbMsgId && cbMsgId !== pending.sentMessageId)) {
+          await ctx.answerCallbackQuery({ text: 'Expired prompt' })
+          return
+        }
+
+        const access = deps.withAccessLock(() => deps.loadAccess())
+        if (!isUserAuthorized(userId, access)) {
+          await ctx.answerCallbackQuery({ text: 'Not authorized' })
+          return
+        }
+
+        const idx = parseInt(data.slice('ask_answer_'.length), 10)
+        const answer = pending.options?.[idx]?.label ?? `Option ${idx}`
+
+        writeAskReply(deps.stateDir, {
+          nonce: pending.nonce,
+          answer,
+          userId,
+          ts: Date.now(),
+        })
+
+        // Delete pending immediately so a second event can't overwrite the answer
+        deleteAskPending(deps.stateDir)
+
+        await ctx.answerCallbackQuery({ text: 'Sent!' })
+
+        if (pending.sentMessageId) {
+          await bot.api.deleteMessage(chatId, pending.sentMessageId).catch(() => {})
+        }
+        return
+      }
+    }
+
     // Session switch callback
     if (data.startsWith('switch_')) {
       const access = deps.withAccessLock(() => deps.loadAccess())
@@ -193,6 +233,22 @@ async function handleInbound(
   }
 
   const { access } = result
+
+  // Ask-user redirect: route text reply to file (only text, not media)
+  if (!mediaToken) {
+    const askPending = readAskPending(deps.stateDir)
+    if (askPending && String(ctx.chat.id) === askPending.chatId) {
+      writeAskReply(deps.stateDir, {
+        nonce: askPending.nonce,
+        answer: content,
+        userId: String(ctx.from.id),
+        ts: Date.now(),
+      })
+      deleteAskPending(deps.stateDir)
+      return
+    }
+  }
+
   await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
 
   const replyPrefix = extractReplyContext(ctx)

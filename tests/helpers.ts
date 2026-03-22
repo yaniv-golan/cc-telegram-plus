@@ -46,6 +46,7 @@ export function createMockBot() {
       sendPhoto: stub('api.sendPhoto'),
       sendDocument: stub('api.sendDocument'),
       sendChatAction: stub('api.sendChatAction'),
+      deleteMessage: stub('api.deleteMessage'),
     },
     on(event: string, handler: (...args: any[]) => any) {
       if (!eventHandlers[event]) eventHandlers[event] = []

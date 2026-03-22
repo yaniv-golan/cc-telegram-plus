@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test'
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { registerHandlers } from '../src/handlers.ts'
 import {
   createMockBot,
@@ -11,6 +11,11 @@ import {
   createCallbackCtx,
 } from './helpers.ts'
 import type { Deps } from '../src/types.ts'
+import { writeAskPending, readAskReply } from '../src/ask-io.ts'
+import type { AskPending } from '../src/ask-io.ts'
+import { mkdtempSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 
 // Helper to trigger a registered handler by event name
 async function triggerHandler(bot: any, event: string, ctx: any) {
@@ -770,5 +775,156 @@ describe('sticker with reply context', () => {
     expect(notifications[0].params.content).toBe(
       '[Replying to: "original message"]\n(sticker: \u{1F600})',
     )
+  })
+})
+
+describe('ask redirect — callback_query', () => {
+  let deps: Deps
+  let notifications: any[]
+  let botCalls: any[]
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'handler-ask-test-'))
+    const { bot, calls } = createMockBot()
+    const { mcp, notifications: notifs } = createMockMcp()
+    notifications = notifs
+    botCalls = calls
+    deps = createMockDeps({ bot, mcp, stateDir: tmpDir })
+    registerHandlers(deps)
+  })
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('routes ask_answer callback to reply file when pending exists', async () => {
+    const pending: AskPending = {
+      nonce: 'test1234',
+      chatId: '100',
+      sentMessageId: 50,
+      options: [
+        { label: 'Staging', description: 'Deploy to staging' },
+        { label: 'Production', description: 'Deploy to prod' },
+      ],
+      ts: Date.now(),
+    }
+    writeAskPending(tmpDir, pending)
+
+    const ctx = createCallbackCtx('ask_answer_0', { userId: 12345, chatId: 100, messageId: 50 })
+    await triggerHandler(deps.bot, 'callback_query:data', ctx)
+
+    const reply = readAskReply(tmpDir)
+    expect(reply).not.toBeNull()
+    expect(reply!.nonce).toBe('test1234')
+    expect(reply!.answer).toBe('Staging')
+    expect(ctx._answerCalls).toHaveLength(1)
+    expect(notifications).toHaveLength(0)
+
+    const deleteCall = botCalls.find(c => c.method === 'api.deleteMessage')
+    expect(deleteCall).toBeDefined()
+    expect(deleteCall.args[0]).toBe('100')
+    expect(deleteCall.args[1]).toBe(50)
+  })
+
+  it('rejects unauthorized user on ask_answer callback', async () => {
+    const pending: AskPending = {
+      nonce: 'test5678',
+      chatId: '100',
+      sentMessageId: 50,
+      options: [{ label: 'Yes', description: 'Confirm' }],
+      ts: Date.now(),
+    }
+    writeAskPending(tmpDir, pending)
+
+    const ctx = createCallbackCtx('ask_answer_0', { userId: 99999, chatId: 100, messageId: 50 })
+    await triggerHandler(deps.bot, 'callback_query:data', ctx)
+
+    const reply = readAskReply(tmpDir)
+    expect(reply).toBeNull()
+    expect(ctx._answerCalls[0][0]).toEqual({ text: 'Not authorized' })
+  })
+
+  it('rejects callback from wrong message (stale button)', async () => {
+    const pending: AskPending = {
+      nonce: 'test9999',
+      chatId: '100',
+      sentMessageId: 50,
+      options: [{ label: 'Yes', description: 'Confirm' }],
+      ts: Date.now(),
+    }
+    writeAskPending(tmpDir, pending)
+
+    const ctx = createCallbackCtx('ask_answer_0', { userId: 12345, chatId: 100, messageId: 99 })
+    await triggerHandler(deps.bot, 'callback_query:data', ctx)
+
+    const reply = readAskReply(tmpDir)
+    expect(reply).toBeNull()
+    expect(ctx._answerCalls[0][0]).toEqual({ text: 'Expired prompt' })
+  })
+
+  it('falls through to normal callback when no pending', async () => {
+    const ctx = createCallbackCtx('ask_answer_0', { userId: 12345, chatId: 100 })
+    await triggerHandler(deps.bot, 'callback_query:data', ctx)
+
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0].params.content).toBe('[Button pressed: ask_answer_0]')
+  })
+})
+
+describe('ask redirect — text handler', () => {
+  let deps: Deps
+  let notifications: any[]
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'handler-ask-text-'))
+    const { bot, calls } = createMockBot()
+    const { mcp, notifications: notifs } = createMockMcp()
+    notifications = notifs
+    deps = createMockDeps({ bot, mcp, stateDir: tmpDir })
+    registerHandlers(deps)
+  })
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('routes text to reply file when pending exists for matching chat', async () => {
+    const pending: AskPending = {
+      nonce: 'texttest1',
+      chatId: '100',
+      sentMessageId: 50,
+      options: null,
+      ts: Date.now(),
+    }
+    writeAskPending(tmpDir, pending)
+
+    const ctx = createTextCtx('my free text answer', { userId: 12345, chatId: 100 })
+    await triggerHandler(deps.bot, 'message:text', ctx)
+
+    const reply = readAskReply(tmpDir)
+    expect(reply).not.toBeNull()
+    expect(reply!.nonce).toBe('texttest1')
+    expect(reply!.answer).toBe('my free text answer')
+    expect(notifications).toHaveLength(0)
+  })
+
+  it('falls through when pending exists but for different chat', async () => {
+    const pending: AskPending = {
+      nonce: 'texttest2',
+      chatId: '999',
+      sentMessageId: 50,
+      options: null,
+      ts: Date.now(),
+    }
+    writeAskPending(tmpDir, pending)
+
+    const ctx = createTextCtx('hello', { userId: 12345, chatId: 100 })
+    await triggerHandler(deps.bot, 'message:text', ctx)
+
+    const reply = readAskReply(tmpDir)
+    expect(reply).toBeNull()
+    expect(notifications).toHaveLength(1)
   })
 })
