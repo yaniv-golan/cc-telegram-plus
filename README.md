@@ -30,6 +30,7 @@ A community-maintained Telegram channel plugin for Claude Code that extends the 
 | Ack reaction clears on reply | ✘ stays forever | ✔ auto-clears |
 | See what Claude is doing | ✘ | ✔ live tool progress |
 | Permission prompt alerts | ✘ | ✔ sent to Telegram |
+| Answer prompts from phone | ✘ terminal only | ✔ AskUserQuestion → Telegram |
 
 ## Requirements
 

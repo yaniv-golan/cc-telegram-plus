@@ -2,18 +2,26 @@
 
 ## [0.1.1] — 2026-03-22
 
+### Added
+- **AskUserQuestion → Telegram routing.** When Claude needs a decision
+  (confirmation, choice between options), the prompt is forwarded to Telegram
+  with inline buttons instead of blocking in the terminal. Tap a button or
+  type a reply on your phone — Claude continues immediately. Falls through
+  to the terminal prompt for multi-question, multi-select, or multi-user
+  setups. Requires a single `allowFrom` user and an active Telegram session.
+- `hooks/lib/session-guard.py` — shared process-tree check used by hooks
+  to identify whether the current CC instance owns the active Telegram session.
+
 ### Fixed
 - Permission prompt notifications no longer fire for non-Telegram sessions.
   Previously, any Claude Code session with the plugin loaded would send
   "Approval needed" alerts to Telegram, even CLI/IDE sessions with no
-  Telegram user. A session guard now checks that the hook is running inside
-  the CC instance that owns the active Telegram session.
+  Telegram user. The session guard now prevents this.
 - Activity hook (`activity.sh`) applies the same guard, preventing activity
   entries from non-Telegram sessions from polluting `activity.jsonl`.
-
-### Added
-- `hooks/lib/session-guard.py` — shared process-tree check used by both hooks
-  to identify whether the current CC instance owns the active Telegram session.
+- Session activation deadlock: if all sessions ended up with `active: false`
+  (e.g., after crashes), no session could ever become active. Now `activate()`
+  self-promotes when no active session exists.
 
 ## [0.1.0] — 2026-03-21
 
