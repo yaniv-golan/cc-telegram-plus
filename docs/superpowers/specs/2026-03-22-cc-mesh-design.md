@@ -1,11 +1,11 @@
-# cc-mesh: Inter-Claude-Code Communication Plugin
+# cc-mess: Inter-Claude-Code Communication Plugin
 
 **Date:** 2026-03-22
 **Status:** Design approved, pending implementation
 
 ## Overview
 
-cc-mesh is a Claude Code plugin that enables multiple Claude Code instances to discover each other, communicate, delegate tasks, share insights, and develop emergent trust relationships. It uses a file-based transport layer and a symmetric peer architecture with a soft coordinator role.
+cc-mess is a Claude Code plugin that enables multiple Claude Code instances to discover each other, communicate, delegate tasks, share insights, and develop emergent trust relationships. It uses a file-based transport layer and a symmetric peer architecture with a soft coordinator role.
 
 The human observes and controls the mesh via the existing cc-telegram-plus plugin.
 
@@ -17,19 +17,19 @@ The human observes and controls the mesh via the existing cc-telegram-plus plugi
 | Transport | File-based message queues | Crash-resilient, debuggable (`ls` the queue), consistent with cc-telegram-plus patterns |
 | Coordinator | Live Claude Code session | Can reason about routing, make intelligent broadcast decisions, understand context |
 | Worker permissions | `--dangerously-skip-permissions` with hook guardrails | Fast autonomous operation with policy enforcement at the hook layer |
-| Plugin relationship | Separate plugin from cc-telegram-plus | Clean separation. Coordinator runs both; workers run only cc-mesh. |
+| Plugin relationship | Separate plugin from cc-telegram-plus | Clean separation. Coordinator runs both; workers run only cc-mess. |
 | Human visibility | Full visibility via Telegram, passive observer with intervention capability | Human sees everything important, can step in anytime, but doesn't have to |
 | Instance identity | Humanoid names + unique hex suffix | Memorable, readable in logs, unambiguous |
 | Trust model | Per-instance, emergent, private (stored in Claude memory) | No central authority on trust. Instances learn from experience. |
 
 ## 1. File-Based Transport Layer
 
-All state lives under `~/.claude/channels/mesh/`.
+All state lives under `~/.claude/channels/mess/`.
 
 ### Directory Structure
 
 ```
-~/.claude/channels/mesh/
+~/.claude/channels/mess/
 ├── registry.json              # All known instances
 ├── control.json               # Mesh-wide state (paused/running)
 ├── config.json                # Mesh-wide config (guardrails, limits)
@@ -217,7 +217,7 @@ spawn(cwd: "/path/to/project", task: "Refactor the auth module",
 ```
 
 - Runs `claude --dangerously-skip-permissions -p "{task}" --cwd {cwd}`
-- Injects cc-mesh plugin so the new instance joins the mesh automatically
+- Injects cc-mess plugin so the new instance joins the mesh automatically
 - `claude_md` gets appended as additional context for the spawned instance
 - `hooks` selects a guardrail profile (see Section 4)
 - Returns the new instance's name and ID once it registers
@@ -356,14 +356,14 @@ The coordinator parses the `@name` prefix, routes to that instance's inbox as ty
 
 | Command | Effect |
 |---------|--------|
-| `/mesh status` | Show all live instances, tasks, uptime |
-| `/mesh kill hermes` | Send shutdown to hermes |
-| `/mesh spawn /path "task"` | Spawn a new instance |
-| `/mesh pause` | Freeze entire mesh |
-| `/mesh resume` | Resume mesh |
-| `/mesh shutdown_all` | Graceful shutdown of all instances |
-| `/mesh logs hermes` | Show recent messages to/from hermes |
-| `/mesh verbosity quiet\|normal\|verbose` | Control relay noise level |
+| `/mess status` | Show all live instances, tasks, uptime |
+| `/mess kill hermes` | Send shutdown to hermes |
+| `/mess spawn /path "task"` | Spawn a new instance |
+| `/mess pause` | Freeze entire mesh |
+| `/mess resume` | Resume mesh |
+| `/mess shutdown_all` | Graceful shutdown of all instances |
+| `/mess logs hermes` | Show recent messages to/from hermes |
+| `/mess verbosity quiet\|normal\|verbose` | Control relay noise level |
 
 ### Verbosity Levels
 
@@ -374,7 +374,7 @@ The coordinator parses the `@name` prefix, routes to that instance's inbox as ty
 ## 6. Plugin Structure
 
 ```
-cc-mesh/
+cc-mess/
 ├── .claude-plugin/
 │   └── plugin.json
 ├── .mcp.json
@@ -396,8 +396,8 @@ cc-mesh/
 │       ├── permissive.json
 │       └── custom-template.json
 ├── skills/
-│   ├── status/SKILL.md        # /mesh:status
-│   └── configure/SKILL.md     # /mesh:configure
+│   ├── status/SKILL.md        # /mess:status
+│   └── configure/SKILL.md     # /mess:configure
 ├── package.json
 └── tsconfig.json
 ```
@@ -409,7 +409,7 @@ cc-mesh/
 | 1 | Transport & Registry | File-based messaging, inbox polling, registry, heartbeat, control.json, name generation | Nothing |
 | 2 | MCP Server & Tools | Plugin shell, `send`, `reply`, `broadcast`, `list_instances`, `update_self` tools, channel notifications | SP-1 |
 | 3 | Spawn & Guardrails | `spawn`, `kill` tools, guardrail hook profiles, spawn depth enforcement, allowed directories | SP-2 |
-| 4 | Telegram Relay | Mesh event formatting, `/mesh` commands, verbosity control, human-to-instance messaging | SP-3 + cc-telegram-plus |
+| 4 | Telegram Relay | Mesh event formatting, `/mess` commands, verbosity control, human-to-instance messaging | SP-3 + cc-telegram-plus |
 | 5 | Trust & Reputation | Documentation and CLAUDE.md patterns for how instances should use memory for trust signals | SP-2 |
 
 Each sub-project follows its own spec → plan → implement → test cycle.
