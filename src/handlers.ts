@@ -205,7 +205,11 @@ export function registerHandlers(deps: Deps): void {
         await ctx.answerCallbackQuery({ text: 'Session not found' })
         return
       }
-      await sessions.switchTo(targetSessionId, { immediate: true })
+      const switched = await sessions.switchTo(targetSessionId, { immediate: true })
+      if (!switched) {
+        await ctx.answerCallbackQuery({ text: 'Session not found' })
+        return
+      }
       const label = all[targetSessionId]?.label ?? targetSessionId
       await ctx.answerCallbackQuery({ text: `Switched to: ${label}` })
       return
@@ -473,7 +477,11 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
         await deps.bot.api.sendMessage(chatId, `Session not found: ${targetArg}`)
         return true
       }
-      await deps.sessions.switchTo(targetId, { immediate: true })
+      const switched = await deps.sessions.switchTo(targetId, { immediate: true })
+      if (!switched) {
+        await deps.bot.api.sendMessage(chatId, `Session not found: ${targetArg}`)
+        return true
+      }
       const label = all[targetId]?.label ?? targetId
       await deps.bot.api.sendMessage(chatId, `Switched to ${label}`)
     } else {
@@ -510,7 +518,11 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
         await deps.bot.api.sendMessage(chatId, `Session not found: ${targetId}`)
         return true
       }
-      await deps.sessions.switchTo(targetId, { immediate: true })
+      const switched = await deps.sessions.switchTo(targetId, { immediate: true })
+      if (!switched) {
+        await deps.bot.api.sendMessage(chatId, `Session not found: ${targetId}`)
+        return true
+      }
       await deps.bot.api.sendMessage(chatId, `Switching to ${all[targetId]?.label ?? targetId}`)
       return true
     }

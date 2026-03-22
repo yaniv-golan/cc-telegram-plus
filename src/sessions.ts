@@ -246,25 +246,16 @@ export function createSessionManager(opts: {
         watchInterval = null
       }
 
-      // Stop polling first so we don't hold the getUpdates slot while
-      // another process sees us gone and tries to take over.
-      // Use .then() to sequence session removal after bot.stop() without
-      // making stop() async (it's called from sync signal handlers).
-      stopPolling()
-        .catch(() => {})
-        .finally(() => {
-          lockedOp((state) => {
-            delete state.sessions[sessionId]
-          })
-          removePidfile(stateDir)
-        })
-
-      // Also remove synchronously as a fallback — process may exit before
-      // the .finally() runs. Double-remove is safe (delete is idempotent).
+      // Remove session entry and pidfile synchronously. The process is
+      // about to exit (cleanup → process.exit), so peers will detect us
+      // as dead via isSessionAlive() even if this runs slightly before
+      // bot.stop() finishes. No async .finally() needed — the process
+      // exit itself is what releases the getUpdates slot.
       lockedOp((state) => {
         delete state.sessions[sessionId]
       })
       removePidfile(stateDir)
+      stopPolling().catch(() => {})
 
       // Clean up cache file
       const cacheFile = join(stateDir, `cache-${sessionId}.json`)
@@ -275,21 +266,31 @@ export function createSessionManager(opts: {
       }
     },
 
-    async switchTo(targetId: string, opts?: { immediate?: boolean }): Promise<void> {
-      // If this process is the active poller, stop polling BEFORE writing
-      // the switch. This prevents a 409 race: Telegram rejects concurrent
-      // getUpdates calls, and the old poller's grammY crashes on 409.
-      // bot.stop() takes ~3s (waits for pending getUpdates to complete).
+    async switchTo(targetId: string, opts?: { immediate?: boolean }): Promise<boolean> {
+      // Validate target exists under the lock BEFORE stopping polling
+      // to avoid stopping our poller for a nonexistent target.
+      let targetPid: number | null = null
+
+      const targetExists = (() => {
+        let found = false
+        lockedOp((state) => {
+          if (!state.sessions[targetId]) return
+          found = true
+        })
+        return found
+      })()
+
+      if (!targetExists) return false
+
+      // Now safe to stop polling — we know the target is real.
       if (opts?.immediate && wasActive) {
         await stopPolling()
         wasActive = false
       }
 
-      let targetPid: number | null = null
       let targetFound = false
 
       lockedOp((state) => {
-        // Validate target exists under the lock to prevent TOCTOU race
         if (!state.sessions[targetId]) return
         targetFound = true
         for (const [id, session] of Object.entries(state.sessions)) {
@@ -298,7 +299,7 @@ export function createSessionManager(opts: {
         }
       })
 
-      if (!targetFound) return // target disappeared between caller's check and lock
+      if (!targetFound) return false // target disappeared between checks
 
       // Signal the target process to wake up and start polling immediately.
       // Safe to do without delay because bot.stop() already completed above.
@@ -313,6 +314,7 @@ export function createSessionManager(opts: {
       for (const chatId of access.allowFrom) {
         sendNotification(chatId, `Active session: <b>${targetLabel}</b>`, undefined, 'HTML', true).catch(() => {})
       }
+      return true
     },
 
     getAll(): Record<string, Session> {

@@ -49,7 +49,7 @@ function makeDeps(overrides: Partial<Deps> = {}): { deps: Deps; calls: any[] } {
     watch() {},
     stop() {},
     activate() {},
-    switchTo() {},
+    async switchTo() { return true },
     getAll() { return {} },
     getDeepLink() { return '' },
     addAckedMessage(chatId, messageId) {

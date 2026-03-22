@@ -390,7 +390,7 @@ describe('callback handler', () => {
       loadAccess: () => createAccess({ allowFrom: ['12345'] }),
       sessions: {
         ...deps.sessions,
-        switchTo: (id: string) => { switchToCalls.push(id) },
+        switchTo: async (id: string) => { switchToCalls.push(id); return true },
         getAll: () => ({ abc123: { label: 'test', active: false, pid: 1, instanceId: 'x', startedAt: '' } as any }),
       },
     })
@@ -599,7 +599,7 @@ describe('bot commands', () => {
       loadAccess: () => createAccess({ allowFrom: ['12345'] }),
       sessions: {
         ...deps.sessions,
-        switchTo: (id: string) => { switchToCalls.push(id) },
+        switchTo: async (id: string) => { switchToCalls.push(id); return true },
         getAll: () => ({ target123: { pid: 1, instanceId: '1-0', label: 'test', startedAt: new Date().toISOString(), active: false } }),
       },
     })
@@ -619,7 +619,7 @@ describe('bot commands', () => {
       loadAccess: () => createAccess({ allowFrom: ['99999'] }),
       sessions: {
         ...deps.sessions,
-        switchTo: (id: string) => { switchToCalls.push(id) },
+        switchTo: async (id: string) => { switchToCalls.push(id); return true },
       },
     })
     registerHandlers(deps)
@@ -638,7 +638,7 @@ describe('bot commands', () => {
       loadAccess: () => createAccess({ allowFrom: ['12345'] }),
       sessions: {
         ...deps.sessions,
-        switchTo: (id: string) => { switchToCalls.push(id) },
+        switchTo: async (id: string) => { switchToCalls.push(id); return true },
       },
     })
     registerHandlers(deps)
@@ -658,7 +658,7 @@ describe('bot commands', () => {
       loadAccess: () => createAccess({ allowFrom: ['12345'] }),
       sessions: {
         ...deps.sessions,
-        switchTo: (id: string) => { switchToCalls.push(id) },
+        switchTo: async (id: string) => { switchToCalls.push(id); return true },
         getAll: () => ({ abc456: { label: 'test', active: false, pid: 1, instanceId: 'x', startedAt: '' } as any }),
       },
     })
@@ -678,7 +678,7 @@ describe('bot commands', () => {
       loadAccess: () => createAccess({ allowFrom: ['99999'] }),
       sessions: {
         ...deps.sessions,
-        switchTo: (id: string) => { switchToCalls.push(id) },
+        switchTo: async (id: string) => { switchToCalls.push(id); return true },
       },
     })
     registerHandlers(deps)

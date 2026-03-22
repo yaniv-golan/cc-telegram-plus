@@ -13,7 +13,7 @@ function createMockSessions(active = true): SessionManager {
     watch() {},
     stop() {},
     activate() {},
-    switchTo() {},
+    async switchTo() { return true },
     getAll() { return {} },
     getDeepLink() { return '' },
     addAckedMessage() {},

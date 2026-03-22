@@ -63,7 +63,7 @@ export interface SessionManager {
   watch(): void
   stop(): void
   activate(): void
-  switchTo(sessionId: string, opts?: { immediate?: boolean }): void | Promise<void>
+  switchTo(sessionId: string, opts?: { immediate?: boolean }): Promise<boolean>
   getAll(): Record<string, Session>
   getDeepLink(sessionId: string): string
   addAckedMessage(chatId: string, messageId: number): void

@@ -282,7 +282,7 @@ export function createMockDeps(overrides: Partial<Deps> = {}): Deps {
     watch() {},
     stop() {},
     activate() {},
-    switchTo(_sessionId: string) {},
+    async switchTo(_sessionId: string) { return true },
     getAll() { return {} },
     getDeepLink(_sessionId: string) { return '' },
     addAckedMessage(_chatId: string, _messageId: number) {},
