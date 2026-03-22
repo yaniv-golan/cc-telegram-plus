@@ -269,7 +269,7 @@ const botUsername = me.username
 
 // ─── B2. Create access I/O ───────────────────────────────────────────────────
 
-const { loadAccess, saveAccess, withAccessLock } = createAccessIO(stateDir)
+const { loadAccess, saveAccess, withAccessLock, isStatic } = createAccessIO(stateDir)
 
 // ─── B3. Create transcribe closure ───────────────────────────────────────────
 
@@ -308,7 +308,7 @@ let approvalTimer: NodeJS.Timeout | null = null
 let pollingAbort: (() => void) | null = null
 
 const startPolling = () => {
-  if (!approvalTimer) {
+  if (!approvalTimer && !isStatic) {
     approvalTimer = startApprovalPoller({ stateDir, sendNotification })
   }
 

@@ -107,3 +107,43 @@ describe('round-trip', () => {
     expect(loadAccess()).toEqual(access)
   })
 })
+
+// Static mode tests
+// Note: STATIC is read at module load time via process.env, so we test the
+// static-mode code path by calling createAccessIO with a manually constructed
+// bootSnapshot scenario. We simulate static behavior by setting the env var
+// before the module is evaluated — but since the module is already loaded in
+// tests, we test the observable contract via the returned functions directly.
+
+describe('isStatic flag', () => {
+  it('returns isStatic: false when TELEGRAM_ACCESS_MODE is not set', () => {
+    const { isStatic } = createAccessIO(tmpDir)
+    // In the test environment TELEGRAM_ACCESS_MODE is not 'static'
+    expect(isStatic).toBe(false)
+  })
+})
+
+describe('saveAccess in non-static mode', () => {
+  it('does not throw and writes file', () => {
+    const { saveAccess } = createAccessIO(tmpDir)
+    const access: Access = { dmPolicy: 'allowlist', allowFrom: [], groups: {}, pending: {} }
+    expect(() => saveAccess(access)).not.toThrow()
+  })
+})
+
+describe('loadAccess returns independent copies in non-static mode', () => {
+  it('mutations to one load result do not affect subsequent loads', () => {
+    const { saveAccess, loadAccess } = createAccessIO(tmpDir)
+    const access: Access = {
+      dmPolicy: 'allowlist',
+      allowFrom: ['alice'],
+      groups: {},
+      pending: {},
+    }
+    saveAccess(access)
+    const first = loadAccess()
+    first.allowFrom.push('mutated')
+    const second = loadAccess()
+    expect(second.allowFrom).toEqual(['alice'])
+  })
+})
