@@ -169,6 +169,15 @@ export function createSessionManager(opts: {
     },
 
     activate(): void {
+      // If no session is active (e.g., all were stale or deactivated), self-promote
+      lockedOp((state) => {
+        cleanStaleSessions(state, { stateDir, sendNotification, loadAccess })
+        const anyActive = Object.values(state.sessions).some(s => s.active)
+        if (!anyActive && state.sessions[sessionId]) {
+          state.sessions[sessionId].active = true
+        }
+      })
+
       const active = manager.isActive()
       wasActive = active
       if (active) {
