@@ -3,6 +3,12 @@
 # Falls through to terminal (exit 0) for unsupported cases.
 
 STATE_DIR="$HOME/.claude/channels/telegram"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Only proceed if this CC instance owns the active Telegram session
+if ! python3 "$SCRIPT_DIR/lib/session-guard.py" 2>/dev/null; then
+  exit 0
+fi
 
 # Read stdin to temp file (safe for any JSON content)
 TMPINPUT=$(mktemp)
@@ -17,7 +23,6 @@ state_dir = sys.argv[2]
 
 env_file = os.path.join(state_dir, ".env")
 access_file = os.path.join(state_dir, "access.json")
-sessions_file = os.path.join(state_dir, "sessions.json")
 pending_file = os.path.join(state_dir, "ask-pending.json")
 reply_file = os.path.join(state_dir, "ask-reply.json")
 
@@ -65,36 +70,7 @@ if len(allow_from) != 1:
 # In Telegram, a user's ID is also their DM chat_id
 chat_id = allow_from[0]
 
-# 5. Guard: any active AND alive Telegram session
-# Replicates isSessionAlive logic from src/sessions.ts:
-# active: true is not enough — the session may have crashed.
-# Verify PID is running AND pidfile contains matching instanceId.
-try:
-    sessions = json.load(open(sessions_file)).get("sessions", {})
-    alive = False
-    for s in sessions.values():
-        if not s.get("active"):
-            continue
-        pid = s.get("pid")
-        instance_id = s.get("instanceId", "")
-        # Check PID is alive
-        try:
-            os.kill(pid, 0)
-        except (OSError, TypeError):
-            continue
-        # Check pidfile matches instanceId
-        pidfile = os.path.join(state_dir, f"session-{pid}.pid")
-        try:
-            content = open(pidfile).read().strip()
-            if content == instance_id:
-                alive = True
-                break
-        except:
-            continue
-    if not alive:
-        exit_allow()
-except:
-    exit_allow()
+# 5. Session guard is handled in bash (session-guard.py) before this block
 
 # 6. Read bot token
 token = None
