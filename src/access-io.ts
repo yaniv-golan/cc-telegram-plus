@@ -10,12 +10,15 @@ const DEFAULT_ACCESS: Access = {
   pending: {},
 }
 
+const STATIC = process.env.TELEGRAM_ACCESS_MODE === 'static'
+
 export function createAccessIO(stateDir: string): {
   loadAccess: () => Access
   saveAccess: (access: Access) => void
   withAccessLock: <T>(fn: () => T) => T
+  isStatic: boolean
 } {
-  function loadAccess(): Access {
+  function readAccessFile(): Access {
     try {
       const raw = readFileSync(join(stateDir, 'access.json'), 'utf8')
       return JSON.parse(raw) as Access
@@ -24,7 +27,30 @@ export function createAccessIO(stateDir: string): {
     }
   }
 
+  // In static mode, snapshot at boot and never re-read or write
+  let bootSnapshot: Access | null = null
+  if (STATIC) {
+    const a = readAccessFile()
+    if (a.dmPolicy === 'pairing') {
+      process.stderr.write(
+        'telegram channel: static mode — dmPolicy "pairing" downgraded to "allowlist"\n',
+      )
+      a.dmPolicy = 'allowlist'
+    }
+    a.pending = {}
+    bootSnapshot = a
+  }
+
+  function loadAccess(): Access {
+    if (bootSnapshot) {
+      // Deep clone so callers can't mutate the snapshot
+      return JSON.parse(JSON.stringify(bootSnapshot))
+    }
+    return readAccessFile()
+  }
+
   function saveAccess(access: Access): void {
+    if (STATIC) return // silent no-op
     mkdirSync(stateDir, { recursive: true })
     const tmpPath = join(stateDir, 'access.tmp.json')
     const finalPath = join(stateDir, 'access.json')
@@ -36,5 +62,5 @@ export function createAccessIO(stateDir: string): {
     return withLock(join(stateDir, 'access.lock'), fn)
   }
 
-  return { loadAccess, saveAccess, withAccessLock }
+  return { loadAccess, saveAccess, withAccessLock, isStatic: STATIC }
 }

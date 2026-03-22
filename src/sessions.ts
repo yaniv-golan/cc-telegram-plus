@@ -88,7 +88,7 @@ function cleanStaleSessions(state: StateFile, opts?: {
       const newActiveSession = remaining[0][1]
       if (opts) {
         for (const userId of opts.loadAccess().allowFrom) {
-          void opts.sendNotification(userId, `Session switched to: ${newActiveSession.label} (previous session ended)`)
+          opts.sendNotification(userId, `Session switched to: ${newActiveSession.label} (previous session ended)`).catch(() => {})
         }
       }
     }
@@ -100,7 +100,7 @@ function cleanStaleSessions(state: StateFile, opts?: {
 export function createSessionManager(opts: {
   stateDir: string
   startPolling: () => void
-  stopPolling: () => void
+  stopPolling: () => Promise<void>
   sendNotification: (chatId: string, text: string, keyboard?: InlineButton[][], parseMode?: string, pin?: boolean) => Promise<void>
   loadAccess: () => Access
   botUsername: string
@@ -157,11 +157,11 @@ export function createSessionManager(opts: {
         const access = loadAccess()
         const shortLabel = label.includes(' \u{2014} ') ? label.split(' \u{2014} ')[1] : label
         for (const userId of access.allowFrom) {
-          void sendNotification(userId,
+          sendNotification(userId,
             `\u{1F7E2} <b>${notifyNewSession.label}</b>\n\u{26AA} <b>${label}</b> (new)`,
             [[{ text: shortLabel, callback_data: `switch_${sessionId}` }, { text: 'Keep', callback_data: 'switch_dismiss' }]],
             'HTML',
-          )
+          ).catch(() => {})
         }
       }
 
@@ -246,7 +246,7 @@ export function createSessionManager(opts: {
         watchInterval = null
       }
 
-      void stopPolling()
+      stopPolling().catch(() => {})
 
       lockedOp((state) => {
         delete state.sessions[sessionId]

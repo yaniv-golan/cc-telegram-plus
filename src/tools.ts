@@ -97,7 +97,7 @@ async function handleReply(args: Record<string, any>, deps: Deps): Promise<ToolR
   }
 
   // 5. Chunk text
-  const effectiveParseMode = parse_mode ?? 'MarkdownV2'
+  const effectiveParseMode = parse_mode
   const chunkLimit = access.textChunkLimit ?? 4096
   const chunkMode = access.chunkMode ?? 'length'
   const chunks = text ? chunk(text, chunkLimit, chunkMode) : []
@@ -135,7 +135,7 @@ async function handleReply(args: Record<string, any>, deps: Deps): Promise<ToolR
   // 7. Send text chunks
   for (let i = 0; i < chunks.length; i++) {
     const isLast = i === lastTextIdx
-    const opts: any = { parse_mode: effectiveParseMode }
+    const opts: any = { ...(effectiveParseMode ? { parse_mode: effectiveParseMode } : {}) }
 
     // reply_to logic
     if (replyToMsgId) {

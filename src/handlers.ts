@@ -2,6 +2,10 @@ import type { Deps } from './types.ts'
 import { gate, pruneExpired, isUserAuthorized } from './gate.ts'
 import { readAskPending, writeAskReply, deleteAskPending } from './ask-io.ts'
 
+export function safeName(s: string | undefined): string | undefined {
+  return s?.replace(/[<>\[\]\r\n;]/g, '_')
+}
+
 export function registerHandlers(deps: Deps): void {
   const { bot, mcp, cache, sessions } = deps
 
@@ -12,6 +16,7 @@ export function registerHandlers(deps: Deps): void {
     // Reply to /name prompt
     const replyTo = ctx.message?.reply_to_message
     if (replyTo?.from?.id === bot.botInfo?.id && replyTo?.text?.startsWith('Reply to this message with the new session name')) {
+      if (ctx.chat?.type !== 'private') return
       const userId = String(ctx.from.id)
       const access = deps.withAccessLock(() => deps.loadAccess())
       if (isUserAuthorized(userId, access)) {
@@ -47,7 +52,7 @@ export function registerHandlers(deps: Deps): void {
 
   bot.on('message:document', async (ctx) => {
     const doc = ctx.message.document
-    const content = ctx.message.caption || doc.file_name || '(document)'
+    const content = ctx.message.caption || safeName(doc.file_name) || '(document)'
     const mediaToken = `document:${doc.file_id}:${doc.file_unique_id}`
     await handleInbound(ctx, content, mediaToken, deps)
   })
@@ -82,7 +87,7 @@ export function registerHandlers(deps: Deps): void {
 
   bot.on('message:audio', async (ctx) => {
     const audio = ctx.message.audio
-    const content = ctx.message.caption || audio.title || audio.file_name || '(audio)'
+    const content = ctx.message.caption || safeName(audio.title) || safeName(audio.file_name) || '(audio)'
     const mediaToken = `audio:${audio.file_id}:${audio.file_unique_id}`
     await handleInbound(ctx, content, mediaToken, deps)
   })
@@ -132,7 +137,7 @@ export function registerHandlers(deps: Deps): void {
             ts: new Date().toISOString(),
           },
         },
-      })
+      }).catch(err => process.stderr.write(`telegram channel: reaction notification error: ${err}\n`))
     }
   })
 
@@ -238,7 +243,7 @@ export function registerHandlers(deps: Deps): void {
           reply_to_message_id: String(ctx.callbackQuery.message?.message_id ?? ''),
         },
       },
-    })
+    }).catch(err => process.stderr.write(`telegram channel: callback notification error: ${err}\n`))
 
     await ctx.answerCallbackQuery()
   })
@@ -286,10 +291,13 @@ async function handleInbound(
   const meta = buildMeta(ctx)
   if (mediaToken) meta.media_token = mediaToken
 
+  // TODO(Goal-B): await this and only cache/ack on success once MCP SDK
+  // delivery contract is verified. For now, .catch() prevents unhandled
+  // rejection from crashing the process.
   mcp.notification({
     method: 'notifications/claude/channel',
     params: { content: fullContent, meta },
-  })
+  }).catch((err: any) => process.stderr.write(`telegram channel: inbound notification failed: ${err}\n`))
 
   cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
   sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
@@ -374,6 +382,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/sessions') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const all = deps.sessions.getAll()
@@ -398,6 +407,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/status') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const all = deps.sessions.getAll()
@@ -412,6 +422,7 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/name') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
     const newName = parts.slice(1).join(' ').trim()
@@ -429,9 +440,9 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/switch') {
+    if (ctx.chat?.type !== 'private') return true
     const access = deps.withAccessLock(() => deps.loadAccess())
     if (!isUserAuthorized(userId, access)) return true
-    if (ctx.chat.type !== 'private') return true
     const targetArg = parts.slice(1).join(' ').trim()
     if (targetArg) {
       const all = deps.sessions.getAll()
@@ -468,12 +479,44 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
     return true
   }
 
-  if (cmd === '/start' && parts[1]?.startsWith('switch_')) {
+  if (cmd === '/start') {
+    // All /start variants are DM-only
+    if (ctx.chat?.type !== 'private') return true
+    // Deep-link: /start switch_<id> for session switching
+    if (parts[1]?.startsWith('switch_')) {
+      const access = deps.withAccessLock(() => deps.loadAccess())
+      if (!isUserAuthorized(userId, access)) return true
+      const targetId = parts[1].slice('switch_'.length)
+      await deps.sessions.switchTo(targetId, { immediate: true })
+      await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
+      return true
+    }
     const access = deps.withAccessLock(() => deps.loadAccess())
-    if (!isUserAuthorized(userId, access)) return true
-    const targetId = parts[1].slice('switch_'.length)
-    await deps.sessions.switchTo(targetId, { immediate: true })
-    await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
+    const pairingText = access.dmPolicy === 'pairing'
+      ? `To pair:\n` +
+        `1. DM me anything — you'll get a 4-char code\n` +
+        `2. In Claude Code: /telegram:access pair <code>\n\n` +
+        `After that, DMs here reach that session.`
+      : access.dmPolicy === 'disabled'
+        ? `This bot isn't accepting new connections.`
+        : `This bot is in allowlist mode. Ask the bot owner to add you.`
+    await deps.bot.api.sendMessage(chatId,
+      `This bot bridges Telegram to a Claude Code session.\n\n${pairingText}`
+    )
+    return true
+  }
+
+  if (cmd === '/help') {
+    if (ctx.chat?.type !== 'private') return true
+    await deps.bot.api.sendMessage(chatId,
+      `Messages you send here route to a paired Claude Code session. ` +
+      `Text, photos, documents, and voice messages are forwarded; replies and reactions come back.\n\n` +
+      `/start — pairing instructions\n` +
+      `/sessions — list active sessions\n` +
+      `/switch — switch to another session\n` +
+      `/status — show current active session\n` +
+      `/chatid — show this chat's ID`
+    )
     return true
   }
 

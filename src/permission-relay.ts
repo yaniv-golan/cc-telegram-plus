@@ -122,10 +122,13 @@ export function createPermissionRelay(opts: {
       if (!entry) return false
 
       // Send decision back to CC
+      // TODO(Goal-B): make resolveByKey async, await this, and only update
+      // Telegram on success. For now, .catch() prevents unhandled rejection
+      // from crashing the process.
       mcp.notification({
         method: 'notifications/claude/channel/permission',
         params: { request_id: entry.requestId, behavior },
-      })
+      }).catch((err: any) => process.stderr.write(`telegram channel: permission notification failed: ${err}\n`))
 
       // Update Telegram messages
       const resultText = behavior === 'allow' ? '\u2705 Allowed' : '\u274C Denied'
