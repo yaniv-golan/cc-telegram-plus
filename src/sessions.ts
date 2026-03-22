@@ -246,12 +246,24 @@ export function createSessionManager(opts: {
         watchInterval = null
       }
 
-      stopPolling().catch(() => {})
+      // Stop polling first so we don't hold the getUpdates slot while
+      // another process sees us gone and tries to take over.
+      // Use .then() to sequence session removal after bot.stop() without
+      // making stop() async (it's called from sync signal handlers).
+      stopPolling()
+        .catch(() => {})
+        .finally(() => {
+          lockedOp((state) => {
+            delete state.sessions[sessionId]
+          })
+          removePidfile(stateDir)
+        })
 
+      // Also remove synchronously as a fallback — process may exit before
+      // the .finally() runs. Double-remove is safe (delete is idempotent).
       lockedOp((state) => {
         delete state.sessions[sessionId]
       })
-
       removePidfile(stateDir)
 
       // Clean up cache file
@@ -274,13 +286,19 @@ export function createSessionManager(opts: {
       }
 
       let targetPid: number | null = null
+      let targetFound = false
 
       lockedOp((state) => {
+        // Validate target exists under the lock to prevent TOCTOU race
+        if (!state.sessions[targetId]) return
+        targetFound = true
         for (const [id, session] of Object.entries(state.sessions)) {
           session.active = id === targetId
           if (id === targetId) targetPid = session.pid
         }
       })
+
+      if (!targetFound) return // target disappeared between caller's check and lock
 
       // Signal the target process to wake up and start polling immediately.
       // Safe to do without delay because bot.stop() already completed above.
@@ -300,10 +318,10 @@ export function createSessionManager(opts: {
     getAll(): Record<string, Session> {
       const state = readState(stateDir)
 
-      // Check for stale sessions
+      // Check for stale sessions (use isSessionAlive for PID reuse safety)
       let needsCleanup = false
       for (const [, session] of Object.entries(state.sessions)) {
-        if (!isProcessAlive(session.pid)) {
+        if (!isSessionAlive(session, stateDir)) {
           needsCleanup = true
           break
         }
