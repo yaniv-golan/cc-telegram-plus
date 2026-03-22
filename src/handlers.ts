@@ -2,6 +2,10 @@ import type { Deps } from './types.ts'
 import { gate, pruneExpired, isUserAuthorized } from './gate.ts'
 import { readAskPending, writeAskReply, deleteAskPending } from './ask-io.ts'
 
+export function safeName(s: string | undefined): string | undefined {
+  return s?.replace(/[<>\[\]\r\n;]/g, '_')
+}
+
 export function registerHandlers(deps: Deps): void {
   const { bot, mcp, cache, sessions } = deps
 
@@ -47,7 +51,7 @@ export function registerHandlers(deps: Deps): void {
 
   bot.on('message:document', async (ctx) => {
     const doc = ctx.message.document
-    const content = ctx.message.caption || doc.file_name || '(document)'
+    const content = ctx.message.caption || safeName(doc.file_name) || '(document)'
     const mediaToken = `document:${doc.file_id}:${doc.file_unique_id}`
     await handleInbound(ctx, content, mediaToken, deps)
   })
@@ -82,7 +86,7 @@ export function registerHandlers(deps: Deps): void {
 
   bot.on('message:audio', async (ctx) => {
     const audio = ctx.message.audio
-    const content = ctx.message.caption || audio.title || audio.file_name || '(audio)'
+    const content = ctx.message.caption || safeName(audio.title) || safeName(audio.file_name) || '(audio)'
     const mediaToken = `audio:${audio.file_id}:${audio.file_unique_id}`
     await handleInbound(ctx, content, mediaToken, deps)
   })
