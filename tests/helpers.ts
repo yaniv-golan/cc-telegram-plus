@@ -252,6 +252,7 @@ export function createMockMcp() {
   const mcp: any = {
     notification(params: any) {
       notifications.push(params)
+      return Promise.resolve()
     },
     setRequestHandler(schema: any, handler: any) {
       requestHandlers.set(schema, handler)

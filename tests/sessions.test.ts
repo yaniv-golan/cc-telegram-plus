@@ -22,7 +22,7 @@ function makeOpts(stateDir: string, overrides: Record<string, any> = {}) {
     opts: {
       stateDir,
       startPolling: () => { calls.push({ method: 'startPolling', args: [] }) },
-      stopPolling: () => { calls.push({ method: 'stopPolling', args: [] }) },
+      stopPolling: () => { calls.push({ method: 'stopPolling', args: [] }); return Promise.resolve() },
       sendNotification: async (chatId: string, text: string, keyboard?: InlineButton[][]) => {
         calls.push({ method: 'sendNotification', args: [chatId, text, keyboard] })
       },

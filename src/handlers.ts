@@ -137,7 +137,7 @@ export function registerHandlers(deps: Deps): void {
             ts: new Date().toISOString(),
           },
         },
-      })
+      }).catch(err => process.stderr.write(`telegram channel: reaction notification error: ${err}\n`))
     }
   })
 
@@ -243,7 +243,7 @@ export function registerHandlers(deps: Deps): void {
           reply_to_message_id: String(ctx.callbackQuery.message?.message_id ?? ''),
         },
       },
-    })
+    }).catch(err => process.stderr.write(`telegram channel: callback notification error: ${err}\n`))
 
     await ctx.answerCallbackQuery()
   })

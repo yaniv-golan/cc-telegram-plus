@@ -7,7 +7,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { Bot } from 'grammy'
+import { Bot, GrammyError } from 'grammy'
 import { createSessionManager, startApprovalPoller, stopApprovalPoller } from './sessions.ts'
 import { createCache } from './cache.ts'
 import { createAccessIO } from './access-io.ts'
@@ -65,6 +65,20 @@ if (!token) {
 // ─── A3. Create Bot (no network call) ────────────────────────────────────────
 
 const bot = new Bot(token)
+
+bot.catch(err => {
+  process.stderr.write(`telegram channel: handler error (polling continues): ${(err as any).error ?? err}\n`)
+})
+
+process.on('uncaughtException', err => {
+  process.stderr.write(`telegram channel: uncaught exception: ${err}\n`)
+  process.exit(1)
+})
+
+process.on('unhandledRejection', err => {
+  process.stderr.write(`telegram channel: unhandled rejection: ${err}\n`)
+  process.exit(1)
+})
 
 // ─── A4. Create MCP Server ───────────────────────────────────────────────────
 
@@ -291,11 +305,52 @@ const label = `${deriveIde()} — ${basename(projectDir)}`
 // ─── B5. Create SessionManager ───────────────────────────────────────────────
 
 let approvalTimer: NodeJS.Timeout | null = null
+let pollingAbort: (() => void) | null = null
+
 const startPolling = () => {
-  void bot.start({ allowed_updates: ['message', 'message_reaction', 'callback_query'] })
-  approvalTimer = startApprovalPoller({ stateDir, sendNotification })
+  if (!approvalTimer) {
+    approvalTimer = startApprovalPoller({ stateDir, sendNotification })
+  }
+
+  let cancelled = false
+  pollingAbort = () => { cancelled = true }
+
+  void (async () => {
+    for (let attempt = 1; ; attempt++) {
+      if (cancelled || !sessions.isActive()) return
+
+      try {
+        await bot.start({ allowed_updates: ['message', 'message_reaction', 'callback_query'] })
+        return // bot.stop() was called — clean exit
+      } catch (err) {
+        if (cancelled || !sessions.isActive()) return
+
+        // Expected: bot.stop() during setup
+        if (err instanceof Error && err.message === 'Aborted delay') return
+
+        // 409 Conflict: another poller is active (zombie or external)
+        if (err instanceof GrammyError && err.error_code === 409) {
+          const delay = Math.min(1000 * attempt, 15000)
+          const detail = attempt === 1
+            ? ' — another instance is polling (zombie session?)'
+            : ''
+          process.stderr.write(
+            `telegram channel: 409 Conflict${detail}, retrying in ${delay / 1000}s\n`,
+          )
+          await new Promise(r => setTimeout(r, delay))
+          continue
+        }
+
+        // Unexpected error
+        process.stderr.write(`telegram channel: polling failed: ${err}\n`)
+        return
+      }
+    }
+  })()
 }
+
 const stopPolling = async () => {
+  if (pollingAbort) { pollingAbort(); pollingAbort = null }
   await bot.stop()
   if (approvalTimer) { stopApprovalPoller(approvalTimer); approvalTimer = null }
 }
@@ -389,10 +444,10 @@ void bot.api.setMyCommands(
 
 void bot.api.setMyDescription(
   'Enhanced Telegram channel for Claude Code. Supports all media types, voice transcription, session management, and more.',
-)
+).catch(() => {})
 void bot.api.setMyShortDescription(
   'Claude Code ↔ Telegram (enhanced)',
-)
+).catch(() => {})
 
 // ─── B11. Start activity watcher ─────────────────────────────────────────────
 
