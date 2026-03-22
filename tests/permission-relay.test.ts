@@ -139,7 +139,7 @@ describe('permission-relay', () => {
       const key = allowData.split(':')[2]
 
       const result = await relay.resolveByKey(key, 'allow')
-      expect(result).toBe(true)
+      expect(result).toBe('resolved')
 
       // Verify MCP notification sent back to CC
       expect(mcpNotifications).toHaveLength(1)
@@ -157,7 +157,7 @@ describe('permission-relay', () => {
     it('returns false for unknown key', async () => {
       const relay = makeRelay()
       const result = await relay.resolveByKey('nonexistent', 'allow')
-      expect(result).toBe(false)
+      expect(result).toBe('not_found')
       expect(mcpNotifications).toHaveLength(0)
     })
 
@@ -170,8 +170,8 @@ describe('permission-relay', () => {
       const keyboard = sends[0].args[2]?.reply_markup?.inline_keyboard
       const key = keyboard[0][0].callback_data.split(':')[2]
 
-      expect(await relay.resolveByKey(key, 'allow')).toBe(true)
-      expect(await relay.resolveByKey(key, 'deny')).toBe(false)
+      expect(await relay.resolveByKey(key, 'allow')).toBe('resolved')
+      expect(await relay.resolveByKey(key, 'deny')).toBe('not_found')
 
       // Only one MCP notification
       expect(mcpNotifications).toHaveLength(1)
@@ -187,7 +187,7 @@ describe('permission-relay', () => {
       const key = keyboard[0][1].callback_data.split(':')[2]
 
       const result = await relay.resolveByKey(key, 'deny')
-      expect(result).toBe(true)
+      expect(result).toBe('resolved')
 
       expect(mcpNotifications[0].params.behavior).toBe('deny')
 
@@ -220,7 +220,7 @@ describe('permission-relay', () => {
 
       relay.cleanup()
 
-      expect(await relay.resolveByKey(key, 'allow')).toBe(false)
+      expect(await relay.resolveByKey(key, 'allow')).toBe('not_found')
       expect(mcpNotifications).toHaveLength(0)
     })
   })

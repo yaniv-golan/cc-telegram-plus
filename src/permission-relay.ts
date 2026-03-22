@@ -14,7 +14,7 @@ export type PermissionRequestParams = {
 
 export interface PermissionRelay {
   handleRequest(params: PermissionRequestParams): void
-  resolveByKey(key: string, behavior: 'allow' | 'deny'): Promise<boolean>
+  resolveByKey(key: string, behavior: 'allow' | 'deny'): Promise<'resolved' | 'not_found' | 'send_failed'>
   cleanup(): void
 }
 
@@ -119,7 +119,7 @@ export function createPermissionRelay(opts: {
 
     async resolveByKey(key, behavior) {
       const entry = pending.get(key)
-      if (!entry) return false
+      if (!entry) return 'not_found'
 
       // Await the notification so we only show success UI if the transport
       // accepted the bytes. On rejection, leave the pending entry intact
@@ -131,7 +131,7 @@ export function createPermissionRelay(opts: {
         })
       } catch (err) {
         process.stderr.write(`telegram channel: permission notification failed: ${err}\n`)
-        return false
+        return 'send_failed'
       }
 
       // Only update Telegram after successful send
@@ -140,7 +140,7 @@ export function createPermissionRelay(opts: {
 
       clearTimeout(entry.timer)
       pending.delete(key)
-      return true
+      return 'resolved'
     },
 
     cleanup() {

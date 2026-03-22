@@ -217,8 +217,12 @@ export function registerHandlers(deps: Deps): void {
         return
       }
 
-      const resolved = await deps.permissionRelay.resolveByKey(key, behavior)
-      if (!resolved) {
+      const result = await deps.permissionRelay.resolveByKey(key, behavior)
+      if (result === 'not_found') {
+        await ctx.answerCallbackQuery({ text: 'Already resolved' })
+        return
+      }
+      if (result === 'send_failed') {
         await ctx.answerCallbackQuery({ text: 'Failed to send — try again' })
         return
       }

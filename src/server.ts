@@ -306,8 +306,12 @@ const label = `${deriveIde()} — ${basename(projectDir)}`
 
 let approvalTimer: NodeJS.Timeout | null = null
 let pollingAbort: (() => void) | null = null
+let pollingActive = false
 
 const startPolling = () => {
+  if (pollingActive) return // prevent double-entry from concurrent checkState() calls
+  pollingActive = true
+
   if (!approvalTimer && !isStatic) {
     approvalTimer = startApprovalPoller({ stateDir, sendNotification })
   }
@@ -350,6 +354,7 @@ const startPolling = () => {
 }
 
 const stopPolling = async () => {
+  pollingActive = false
   if (pollingAbort) { pollingAbort(); pollingAbort = null }
   await bot.stop()
   if (approvalTimer) { stopApprovalPoller(approvalTimer); approvalTimer = null }
