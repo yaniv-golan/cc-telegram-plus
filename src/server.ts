@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, unlinkSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -396,6 +396,12 @@ const cleanup = () => {
   activityWatcher.stop()
   cache.flush()
   sessions.stop()
+
+  // Clean up ask files if we're the active poller
+  if (sessions.isActive()) {
+    try { unlinkSync(join(stateDir, 'ask-pending.json')) } catch {}
+    try { unlinkSync(join(stateDir, 'ask-reply.json')) } catch {}
+  }
 }
 process.on('SIGINT', cleanup)
 process.on('SIGTERM', cleanup)
