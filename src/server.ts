@@ -341,9 +341,9 @@ const startPolling = () => {
           continue
         }
 
-        // Unexpected error
+        // Unexpected error — exit so session failover can promote another session
         process.stderr.write(`telegram channel: polling failed: ${err}\n`)
-        return
+        process.exit(1)
       }
     }
   })()

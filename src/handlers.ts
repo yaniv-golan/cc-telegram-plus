@@ -477,6 +477,8 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
   }
 
   if (cmd === '/start') {
+    // All /start variants are DM-only
+    if (ctx.chat?.type !== 'private') return true
     // Deep-link: /start switch_<id> for session switching
     if (parts[1]?.startsWith('switch_')) {
       const access = deps.withAccessLock(() => deps.loadAccess())
@@ -486,8 +488,6 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
       await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
       return true
     }
-    // Bare /start: onboarding (DM only)
-    if (ctx.chat?.type !== 'private') return true
     await deps.bot.api.sendMessage(chatId,
       `This bot bridges Telegram to a Claude Code session.\n\n` +
       `To pair:\n` +
