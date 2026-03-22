@@ -1,6 +1,6 @@
 {
   "name": "telegram",
   "description": "Enhanced Telegram channel for Claude Code — drop-in replacement with all media types, voice transcription, session management, and more. Manage pairing, allowlists, and policy via /telegram:access.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "keywords": ["telegram", "messaging", "channel", "mcp"]
 }

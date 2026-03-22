@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.1] — 2026-03-22
+## [0.2.0] — 2026-03-22
 
 ### Added
 - **AskUserQuestion → Telegram routing.** When Claude needs a decision
