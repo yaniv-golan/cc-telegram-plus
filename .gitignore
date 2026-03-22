@@ -1,4 +1,7 @@
 node_modules/
 dist/
+__pycache__/
 *.tmp.json
 docs/internal/
+docs/superpowers/plans/
+docs/superpowers/specs/
