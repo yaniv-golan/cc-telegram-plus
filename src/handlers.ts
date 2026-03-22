@@ -234,7 +234,7 @@ export function registerHandlers(deps: Deps): void {
         return
       }
       if (result === 'send_failed') {
-        await ctx.answerCallbackQuery({ text: 'Failed to send — try again' })
+        await ctx.answerCallbackQuery({ text: 'Failed to send — respond in terminal' })
         return
       }
 
