@@ -29,13 +29,13 @@ A community-maintained Telegram channel plugin for Claude Code that extends the 
 | See which session is active | ✘ | ✔ pinned status |
 | Ack reaction clears on reply | ✘ stays forever | ✔ auto-clears |
 | See what Claude is doing | ✘ | ✔ live tool progress |
-| Permission prompt alerts | ✘ | ✔ sent to Telegram |
+| Approve permissions from phone | ✘ | ✔ Allow/Deny buttons |
 | Answer prompts from phone | ✘ terminal only | ✔ AskUserQuestion → Telegram |
 
 ## Requirements
 
 - [Bun](https://bun.sh/) runtime
-- Claude Code v2.1.80 or later
+- Claude Code v2.1.81 or later
 - Claude.ai login (console/API key auth not supported for channels)
 
 ## Installation

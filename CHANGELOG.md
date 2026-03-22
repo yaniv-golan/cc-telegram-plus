@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.3.0] — 2026-03-22
+
+### Added
+- **Permission relay — approve/deny from Telegram.** When Claude needs
+  permission to use a tool (Bash, Edit, Write, etc.), an inline-keyboard
+  message with Allow / Deny buttons is sent to Telegram. Tap a button and
+  Claude continues immediately — no need to switch to the terminal.
+  Uses the native `--channels` permission relay protocol introduced in
+  Claude Code v2.1.81. Falls back to the terminal prompt for interactive
+  tools that CC excludes from the relay.
+- `src/permission-relay.ts` — new module handling the CC ↔ Telegram
+  permission negotiation via MCP notifications.
+- `docs/channel-permission-relay.md` — protocol documentation
+  (reverse-engineered from CC v2.1.81 binary).
+
+### Changed
+- `notify-permission.sh` hook removed from `hooks.json`. The hook file is
+  kept on disk for rollback but no longer fires. Permission prompts are now
+  handled by the native relay instead of a one-way notification.
+- MCP server declares `claude/channel/permission` capability alongside
+  `claude/channel`.
+- Activity progress line changed from "Waiting for approval in terminal"
+  to "Awaiting approval" (neutral — covers both relay and terminal paths).
+- Instructions narrowed: Claude now tells Telegram users about terminal
+  approval only for the rare interactive tools excluded from the relay.
+
 ## [0.2.0] — 2026-03-22
 
 ### Added

@@ -37,7 +37,7 @@ function formatToolLine(entry: ActivityEntry): string | null {
     return `\u{1F916} Subagent: ${entry.agent_type ?? 'working'}...`
   }
   if (entry.type === 'permission') {
-    return `\u{26A0}\u{FE0F} Waiting for approval in terminal`
+    return `\u{26A0}\u{FE0F} Awaiting approval`
   }
   return null
 }

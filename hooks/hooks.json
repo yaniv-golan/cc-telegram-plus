@@ -1,5 +1,5 @@
 {
-  "description": "Forward Claude's tool activity and permission prompts to Telegram as progress indicators",
+  "description": "Forward Claude's tool activity to Telegram as progress indicators",
   "hooks": {
     "PreToolUse": [
       {
@@ -55,18 +55,6 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/activity.sh",
             "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "permission_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/notify-permission.sh",
-            "timeout": 10
           }
         ]
       }

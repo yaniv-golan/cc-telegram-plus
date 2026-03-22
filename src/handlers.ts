@@ -195,6 +195,35 @@ export function registerHandlers(deps: Deps): void {
       return
     }
 
+    // Permission relay callback
+    if (data.startsWith('perm:')) {
+      const access = deps.withAccessLock(() => deps.loadAccess())
+      if (!isUserAuthorized(userId, access)) {
+        await ctx.answerCallbackQuery({ text: 'Not authorized' })
+        return
+      }
+
+      const parts = data.split(':')
+      const behavior = parts[1]
+      const key = parts[2]
+
+      if (!key || (behavior !== 'allow' && behavior !== 'deny')) {
+        await ctx.answerCallbackQuery({ text: 'Invalid' })
+        return
+      }
+
+      const resolved = deps.permissionRelay.resolveByKey(key, behavior)
+      if (!resolved) {
+        await ctx.answerCallbackQuery({ text: 'Already resolved' })
+        return
+      }
+
+      await ctx.answerCallbackQuery({
+        text: behavior === 'allow' ? 'Allowed' : 'Denied',
+      })
+      return
+    }
+
     // Regular callback
     mcp.notification({
       method: 'notifications/claude/channel',

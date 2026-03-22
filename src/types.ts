@@ -1,5 +1,6 @@
 import type { Bot } from 'grammy'
 import type { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js'
+import type { PermissionRelay } from './permission-relay.ts'
 
 export type Access = {
   dmPolicy: 'pairing' | 'allowlist' | 'disabled'
@@ -83,5 +84,6 @@ export type Deps = {
   stateDir: string
   botUsername: string
   transcribe?: (buf: Buffer) => Promise<string>
+  permissionRelay: PermissionRelay
   clearProgress?: () => void
 }

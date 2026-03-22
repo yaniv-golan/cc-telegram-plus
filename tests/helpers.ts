@@ -1,4 +1,5 @@
 import type { Access, Deps, SessionManager, MessageCache } from '../src/types.ts'
+import type { PermissionRelay } from '../src/permission-relay.ts'
 
 // ─── Access factory ───────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ export type MockCall = { method: string; args: any[] }
 export function createMockBot() {
   const calls: MockCall[] = []
   const eventHandlers: Record<string, ((...args: any[]) => any)[]> = {}
+  let messageIdCounter = 0
 
   function stub(method: string) {
     return (...args: any[]) => {
@@ -35,7 +37,10 @@ export function createMockBot() {
 
   const bot: any = {
     api: {
-      sendMessage: stub('api.sendMessage'),
+      sendMessage: (...args: any[]) => {
+        calls.push({ method: 'api.sendMessage', args })
+        return Promise.resolve({ message_id: ++messageIdCounter })
+      },
       setMessageReaction: stub('api.setMessageReaction'),
       editMessageText: stub('api.editMessageText'),
       getFile: stub('api.getFile'),
@@ -283,6 +288,7 @@ export function createMockDeps(overrides: Partial<Deps> = {}): Deps {
     clearAckedMessages(_chatId: string) { return [] },
     getLastInbound(_chatId: string) { return undefined },
     setLastInbound(_chatId: string, _messageId: string) {},
+    renameSession(_label: string) {},
   }
 
   const defaults: Deps = {
@@ -296,6 +302,11 @@ export function createMockDeps(overrides: Partial<Deps> = {}): Deps {
     stateDir: '/tmp/test-state',
     botUsername: 'testbot',
     transcribe: undefined,
+    permissionRelay: {
+      handleRequest() {},
+      resolveByKey() { return false },
+      cleanup() {},
+    },
   }
 
   return { ...defaults, ...overrides }
