@@ -291,10 +291,13 @@ async function handleInbound(
   const meta = buildMeta(ctx)
   if (mediaToken) meta.media_token = mediaToken
 
+  // TODO(Goal-B): await this and only cache/ack on success once MCP SDK
+  // delivery contract is verified. For now, .catch() prevents unhandled
+  // rejection from crashing the process.
   mcp.notification({
     method: 'notifications/claude/channel',
     params: { content: fullContent, meta },
-  })
+  }).catch((err: any) => process.stderr.write(`telegram channel: inbound notification failed: ${err}\n`))
 
   cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
   sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
