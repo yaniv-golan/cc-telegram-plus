@@ -114,7 +114,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'reply',
-        description: 'Send a message to a Telegram chat',
+        description: 'Send a message to a Telegram chat. Attach files via the files array — images send as photos (inline preview); other types as documents. Max 50MB each.',
         inputSchema: {
           type: 'object' as const,
           properties: {
@@ -165,7 +165,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'react',
-        description: 'Add an emoji reaction to a message',
+        description: 'Add an emoji reaction to a message. Telegram only accepts a fixed whitelist of emoji reactions.',
         inputSchema: {
           type: 'object' as const,
           properties: {
@@ -381,10 +381,9 @@ void bot.api.setMyCommands(
 void bot.api.setMyCommands(
   [
     { command: 'chatid', description: 'Show this chat ID' },
-    { command: 'sessions', description: 'Show active Claude Code sessions' },
   ],
   { scope: { type: 'all_group_chats' } },
-)
+).catch(() => {})
 
 // ─── B10. Set bot description (fire-and-forget) ─────────────────────────────
 
