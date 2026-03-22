@@ -491,12 +491,17 @@ async function handleCommand(ctx: any, deps: Deps): Promise<boolean> {
       await deps.bot.api.sendMessage(chatId, `Switching to session ${targetId}`)
       return true
     }
+    const access = deps.withAccessLock(() => deps.loadAccess())
+    const pairingText = access.dmPolicy === 'pairing'
+      ? `To pair:\n` +
+        `1. DM me anything — you'll get a 4-char code\n` +
+        `2. In Claude Code: /telegram:access pair <code>\n\n` +
+        `After that, DMs here reach that session.`
+      : access.dmPolicy === 'disabled'
+        ? `This bot isn't accepting new connections.`
+        : `This bot is in allowlist mode. Ask the bot owner to add you.`
     await deps.bot.api.sendMessage(chatId,
-      `This bot bridges Telegram to a Claude Code session.\n\n` +
-      `To pair:\n` +
-      `1. DM me anything — you'll get a 6-char code\n` +
-      `2. In Claude Code: /telegram:access pair <code>\n\n` +
-      `After that, DMs here reach that session.`
+      `This bot bridges Telegram to a Claude Code session.\n\n${pairingText}`
     )
     return true
   }
