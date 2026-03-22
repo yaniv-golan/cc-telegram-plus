@@ -126,7 +126,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Absolute paths to files to attach',
             },
             reply_to: { type: 'string', description: 'Message ID to reply to' },
-            parse_mode: { type: 'string', description: '"MarkdownV2" or "HTML"' },
+            parse_mode: { type: 'string', enum: ['MarkdownV2', 'HTML'], description: 'Formatting mode. Plain text if omitted.' },
             inline_keyboard: {
               type: 'array',
               items: {
@@ -185,7 +185,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => {
             chat_id: { type: 'string', description: 'Telegram chat ID' },
             message_id: { type: 'string', description: 'Message ID to edit' },
             text: { type: 'string', description: 'New message text' },
-            parse_mode: { type: 'string', description: '"MarkdownV2" or "HTML"' },
+            parse_mode: { type: 'string', enum: ['MarkdownV2', 'HTML'], description: 'Formatting mode. Plain text if omitted.' },
             inline_keyboard: {
               type: 'array',
               items: {
