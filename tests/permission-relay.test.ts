@@ -138,7 +138,7 @@ describe('permission-relay', () => {
       const allowData: string = keyboard[0][0].callback_data
       const key = allowData.split(':')[2]
 
-      const result = relay.resolveByKey(key, 'allow')
+      const result = await relay.resolveByKey(key, 'allow')
       expect(result).toBe(true)
 
       // Verify MCP notification sent back to CC
@@ -154,9 +154,9 @@ describe('permission-relay', () => {
       expect(edits[0].args[2]).toContain('Allowed')
     })
 
-    it('returns false for unknown key', () => {
+    it('returns false for unknown key', async () => {
       const relay = makeRelay()
-      const result = relay.resolveByKey('nonexistent', 'allow')
+      const result = await relay.resolveByKey('nonexistent', 'allow')
       expect(result).toBe(false)
       expect(mcpNotifications).toHaveLength(0)
     })
@@ -170,8 +170,8 @@ describe('permission-relay', () => {
       const keyboard = sends[0].args[2]?.reply_markup?.inline_keyboard
       const key = keyboard[0][0].callback_data.split(':')[2]
 
-      expect(relay.resolveByKey(key, 'allow')).toBe(true)
-      expect(relay.resolveByKey(key, 'deny')).toBe(false)
+      expect(await relay.resolveByKey(key, 'allow')).toBe(true)
+      expect(await relay.resolveByKey(key, 'deny')).toBe(false)
 
       // Only one MCP notification
       expect(mcpNotifications).toHaveLength(1)
@@ -186,7 +186,7 @@ describe('permission-relay', () => {
       const keyboard = sends[0].args[2]?.reply_markup?.inline_keyboard
       const key = keyboard[0][1].callback_data.split(':')[2]
 
-      const result = relay.resolveByKey(key, 'deny')
+      const result = await relay.resolveByKey(key, 'deny')
       expect(result).toBe(true)
 
       expect(mcpNotifications[0].params.behavior).toBe('deny')
@@ -220,7 +220,7 @@ describe('permission-relay', () => {
 
       relay.cleanup()
 
-      expect(relay.resolveByKey(key, 'allow')).toBe(false)
+      expect(await relay.resolveByKey(key, 'allow')).toBe(false)
       expect(mcpNotifications).toHaveLength(0)
     })
   })

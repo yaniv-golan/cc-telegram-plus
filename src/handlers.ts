@@ -217,9 +217,9 @@ export function registerHandlers(deps: Deps): void {
         return
       }
 
-      const resolved = deps.permissionRelay.resolveByKey(key, behavior)
+      const resolved = await deps.permissionRelay.resolveByKey(key, behavior)
       if (!resolved) {
-        await ctx.answerCallbackQuery({ text: 'Already resolved' })
+        await ctx.answerCallbackQuery({ text: 'Failed to send — try again' })
         return
       }
 
@@ -291,18 +291,21 @@ async function handleInbound(
   const meta = buildMeta(ctx)
   if (mediaToken) meta.media_token = mediaToken
 
-  // TODO(Goal-B): await this and only cache/ack on success once MCP SDK
-  // delivery contract is verified. For now, .catch() prevents unhandled
-  // rejection from crashing the process.
-  mcp.notification({
-    method: 'notifications/claude/channel',
-    params: { content: fullContent, meta },
-  }).catch((err: any) => process.stderr.write(`telegram channel: inbound notification failed: ${err}\n`))
-
-  cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
-  sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
-
-  await applyAck(ctx, access, deps)
+  // Await the notification so we only cache/ack on successful send.
+  // Note: resolving only means the transport accepted the bytes, not that
+  // Claude Code received them. But rejecting means a known send failure
+  // (broken pipe, buffer error) — in that case, don't show success UI.
+  try {
+    await mcp.notification({
+      method: 'notifications/claude/channel',
+      params: { content: fullContent, meta },
+    })
+    cache.set(String(ctx.chat!.id), String(ctx.message!.message_id), fullContent)
+    sessions.setLastInbound(String(ctx.chat!.id), String(ctx.message!.message_id))
+    await applyAck(ctx, access, deps)
+  } catch (err) {
+    process.stderr.write(`telegram channel: inbound notification failed: ${err}\n`)
+  }
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

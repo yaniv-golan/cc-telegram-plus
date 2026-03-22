@@ -14,7 +14,7 @@ export type PermissionRequestParams = {
 
 export interface PermissionRelay {
   handleRequest(params: PermissionRequestParams): void
-  resolveByKey(key: string, behavior: 'allow' | 'deny'): boolean
+  resolveByKey(key: string, behavior: 'allow' | 'deny'): Promise<boolean>
   cleanup(): void
 }
 
@@ -117,20 +117,24 @@ export function createPermissionRelay(opts: {
       })
     },
 
-    resolveByKey(key, behavior) {
+    async resolveByKey(key, behavior) {
       const entry = pending.get(key)
       if (!entry) return false
 
-      // Send decision back to CC
-      // TODO(Goal-B): make resolveByKey async, await this, and only update
-      // Telegram on success. For now, .catch() prevents unhandled rejection
-      // from crashing the process.
-      mcp.notification({
-        method: 'notifications/claude/channel/permission',
-        params: { request_id: entry.requestId, behavior },
-      }).catch((err: any) => process.stderr.write(`telegram channel: permission notification failed: ${err}\n`))
+      // Await the notification so we only show success UI if the transport
+      // accepted the bytes. On rejection, leave the pending entry intact
+      // so expiry can clean it up.
+      try {
+        await mcp.notification({
+          method: 'notifications/claude/channel/permission',
+          params: { request_id: entry.requestId, behavior },
+        })
+      } catch (err) {
+        process.stderr.write(`telegram channel: permission notification failed: ${err}\n`)
+        return false
+      }
 
-      // Update Telegram messages
+      // Only update Telegram after successful send
       const resultText = behavior === 'allow' ? '\u2705 Allowed' : '\u274C Denied'
       editMessages(entry, resultText)
 
