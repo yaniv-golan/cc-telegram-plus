@@ -3,9 +3,15 @@
 # Called by CC as a Notification hook (matcher: permission_prompt).
 # Reads JSON from stdin, sends message to all allowFrom users.
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Only send if this CC instance owns the active Telegram session
+if ! python3 "$SCRIPT_DIR/lib/session-guard.py" 2>/dev/null; then
+  exit 0
+fi
+
 ENV_FILE="$HOME/.claude/channels/telegram/.env"
 ACCESS_FILE="$HOME/.claude/channels/telegram/access.json"
-
 # Read stdin
 INPUT=$(cat)
 

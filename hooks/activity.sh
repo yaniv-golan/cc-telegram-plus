@@ -1,7 +1,14 @@
 #!/bin/bash
 # Writes tool activity events to the telegram channel's activity file.
-# Called by CC as a PostToolUse, Stop, SubagentStart, SubagentStop, or Notification hook.
+# Called by CC as a PreToolUse, Stop, SubagentStart, SubagentStop, or Notification hook.
 # Reads JSON from stdin, extracts relevant fields, appends to activity.jsonl.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Only write activity if this CC instance owns the active Telegram session
+if ! python3 "$SCRIPT_DIR/lib/session-guard.py" 2>/dev/null; then
+  exit 0
+fi
 
 ACTIVITY_FILE="$HOME/.claude/channels/telegram/activity.jsonl"
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.1] — 2026-03-22
+
+### Fixed
+- Permission prompt notifications no longer fire for non-Telegram sessions.
+  Previously, any Claude Code session with the plugin loaded would send
+  "Approval needed" alerts to Telegram, even CLI/IDE sessions with no
+  Telegram user. A session guard now checks that the hook is running inside
+  the CC instance that owns the active Telegram session.
+- Activity hook (`activity.sh`) applies the same guard, preventing activity
+  entries from non-Telegram sessions from polluting `activity.jsonl`.
+
+### Added
+- `hooks/lib/session-guard.py` — shared process-tree check used by both hooks
+  to identify whether the current CC instance owns the active Telegram session.
+
 ## [0.1.0] — 2026-03-21
 
 Initial release.

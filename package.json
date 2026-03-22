@@ -1,6 +1,6 @@
 {
   "name": "cc-telegram-plus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Enhanced Telegram channel for Claude Code — drop-in replacement with more features",
   "type": "module",
   "scripts": {
