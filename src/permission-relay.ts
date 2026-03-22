@@ -121,9 +121,11 @@ export function createPermissionRelay(opts: {
       const entry = pending.get(key)
       if (!entry) return 'not_found'
 
-      // Await the notification so we only show success UI if the transport
-      // accepted the bytes. On rejection, leave the pending entry intact
-      // so expiry can clean it up.
+      // Delete from pending BEFORE the async send to prevent duplicate
+      // decisions from double-tap or duplicated callback queries.
+      clearTimeout(entry.timer)
+      pending.delete(key)
+
       try {
         await mcp.notification({
           method: 'notifications/claude/channel/permission',
@@ -131,15 +133,14 @@ export function createPermissionRelay(opts: {
         })
       } catch (err) {
         process.stderr.write(`telegram channel: permission notification failed: ${err}\n`)
+        // Send failed — show error in Telegram so user knows
+        editMessages(entry, '\u26A0\uFE0F Send failed')
         return 'send_failed'
       }
 
-      // Only update Telegram after successful send
+      // Only show success UI after confirmed send
       const resultText = behavior === 'allow' ? '\u2705 Allowed' : '\u274C Denied'
       editMessages(entry, resultText)
-
-      clearTimeout(entry.timer)
-      pending.delete(key)
       return 'resolved'
     },
 

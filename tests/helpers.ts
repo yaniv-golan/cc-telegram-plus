@@ -305,7 +305,7 @@ export function createMockDeps(overrides: Partial<Deps> = {}): Deps {
     transcribe: undefined,
     permissionRelay: {
       handleRequest() {},
-      resolveByKey() { return false },
+      async resolveByKey() { return 'not_found' as const },
       cleanup() {},
     },
   }
