@@ -15,26 +15,28 @@ A community-maintained Telegram channel plugin for Claude Code that extends the 
 
 | What you can do | Official | cc-telegram-plus |
 |---|:---:|:---:|
-| Send text messages | ✔ | ✔ |
-| Send photos | ✔ | ✔ |
-| Send documents, video, audio | ✘ | ✔ |
-| Send voice messages | ✘ | ✔ auto-transcribed |
-| Send stickers | ✘ | ✔ |
-| Reply to a specific message | ✘ | ✔ Claude sees context |
-| React with emoji | ✘ | ✔ Claude sees reactions |
+| Send & receive text messages | ✔ | ✔ |
+| Send & receive photos | ✔ | ✔ |
+| Receive documents, video, audio | ✘ text + photos only | ✔ all media types |
+| Receive voice messages | ✘ | ✔ auto-transcribed |
+| Receive stickers | ✘ | ✔ |
+| Claude sends files as attachments | ✔ | ✔ |
+| Claude reacts with emoji | ✔ | ✔ |
+| User reactions forwarded to Claude | ✘ | ✔ Claude sees feedback |
+| Reply-chain context for Claude | ✘ text only, no parent context | ✔ walks up to 3 levels |
+| Claude threads under user message | ✔ reply_to | ✔ reply_to |
 | Claude sends inline buttons | ✘ | ✔ |
 | Claude sends reply keyboards | ✘ | ✔ |
-| Claude uses rich formatting | ✘ | ✔ MarkdownV2 + HTML |
+| Claude uses rich formatting | ✘ plain text only | ✔ MarkdownV2 + HTML |
 | Switch between CC sessions | ✘ random delivery | ✔ managed switching |
 | See which session is active | ✘ | ✔ pinned status |
-| Ack reaction clears on reply | ✘ stays forever | ✔ auto-clears |
+| Ack reaction auto-clears on reply | ✘ stays forever | ✔ auto-clears |
 | See what Claude is doing | ✘ | ✔ live tool progress |
-| Approve permissions from phone | ✘ | ✔ Allow/Deny buttons |
+| Approve permissions from phone | ✘ terminal only | ✔ Allow/Deny buttons |
 | Answer prompts from phone | ✘ terminal only | ✔ AskUserQuestion → Telegram |
 | Secrets redacted in replies | ✘ | ✔ API keys, tokens, PEM keys scrubbed |
 | Photo albums grouped | ✘ each photo separate | ✔ buffered into single notification |
 | Activity verbosity control | ✘ | ✔ silent / standard / verbose |
-| Deep reply-chain context | ✘ | ✔ walks up to 3 levels |
 
 ## Requirements
 
