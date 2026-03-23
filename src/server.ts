@@ -374,6 +374,9 @@ const sendNotification = async (chatId: string, text: string, keyboard?: any, pa
   }
 }
 
+// onDeactivate is set after permissionRelay is created (circular dep)
+let onDeactivate: (() => void) | undefined
+
 const sessions = createSessionManager({
   stateDir,
   startPolling,
@@ -382,6 +385,7 @@ const sessions = createSessionManager({
   loadAccess,
   botUsername,
   label,
+  onDeactivate: () => onDeactivate?.(),
 })
 
 // ─── B6. Register session + create cache ─────────────────────────────────────
@@ -394,6 +398,9 @@ const cache = createCache(join(stateDir, `cache-${sessionId}.json`))
 const permissionRelay = createPermissionRelay({
   bot, mcp, sessions, loadAccess, stateDir, sessionId,
 })
+
+// Now that permissionRelay exists, wire up the deactivation callback
+onDeactivate = () => permissionRelay.cleanup('session_switched')
 
 // Listen for CC's permission_request notifications (fallbackNotificationHandler
 // catches any notification method not registered via setNotificationHandler)
@@ -496,8 +503,11 @@ const cleanup = () => {
     try { unlinkSync(join(stateDir, 'ask-reply.json')) } catch {}
   }
 }
-process.on('SIGINT', cleanup)
-process.on('SIGTERM', cleanup)
+// Registering signal handlers overrides the default termination behavior,
+// so we must explicitly exit after cleanup. Without process.exit(), the
+// process stays alive in a half-dead state (no watcher, no poller).
+process.on('SIGINT', () => { cleanup(); process.exit(0) })
+process.on('SIGTERM', () => { cleanup(); process.exit(0) })
 process.on('beforeExit', cleanup)
 
 // When CC closes the stdio pipe (session ends), exit cleanly.

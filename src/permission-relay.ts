@@ -15,7 +15,7 @@ export type PermissionRequestParams = {
 export interface PermissionRelay {
   handleRequest(params: PermissionRequestParams): void
   resolveByKey(key: string, behavior: 'allow' | 'deny'): Promise<'resolved' | 'not_found' | 'send_failed'>
-  cleanup(): void
+  cleanup(reason?: 'session_ended' | 'session_switched'): void
 }
 
 type PendingEntry = {
@@ -89,7 +89,11 @@ export function createPermissionRelay(opts: {
 
       const messageIds: { chatId: string; messageId: number }[] = []
 
-      // Send to all allowFrom users, then store pending entry
+      // Insert placeholder BEFORE sending so a fast tap doesn't miss the entry.
+      // messageIds starts empty and is populated as sends complete.
+      const timer = setTimeout(() => expireEntry(key), TTL_MS)
+      pending.set(key, { requestId: params.request_id, messageIds, timer })
+
       const sends = chatIds.map(chatId =>
         bot.api.sendMessage(chatId, text, {
           parse_mode: 'HTML',
@@ -100,10 +104,12 @@ export function createPermissionRelay(opts: {
       )
 
       Promise.all(sends).then(() => {
-        if (messageIds.length === 0) return
-
-        const timer = setTimeout(() => expireEntry(key), TTL_MS)
-        pending.set(key, { requestId: params.request_id, messageIds, timer })
+        if (messageIds.length === 0) {
+          // All sends failed — remove the placeholder
+          clearTimeout(timer)
+          pending.delete(key)
+          return
+        }
 
         // Write activity entry (no sent_messages — so the watcher renders progress)
         const entry = JSON.stringify({
@@ -133,8 +139,10 @@ export function createPermissionRelay(opts: {
         })
       } catch (err) {
         process.stderr.write(`telegram channel: permission notification failed: ${err}\n`)
-        // Send failed — show error in Telegram so user knows
-        editMessages(entry, '\u26A0\uFE0F Send failed')
+        // Re-insert so the user can retry by tapping the button again.
+        // Use a short TTL — if the MCP pipe is broken, retries won't help.
+        const retryTimer = setTimeout(() => expireEntry(key), 30_000)
+        pending.set(key, { ...entry, timer: retryTimer })
         return 'send_failed'
       }
 
@@ -144,10 +152,13 @@ export function createPermissionRelay(opts: {
       return 'resolved'
     },
 
-    cleanup() {
+    cleanup(reason?: 'session_ended' | 'session_switched') {
+      const text = reason === 'session_switched'
+        ? '\u26A0\uFE0F Session switched \u2014 respond in terminal'
+        : '\u23F0 Session ended'
       for (const [key, entry] of pending) {
         clearTimeout(entry.timer)
-        editMessages(entry, '\u23F0 Session ended')
+        editMessages(entry, text)
         pending.delete(key)
       }
     },

@@ -105,8 +105,9 @@ export function createSessionManager(opts: {
   loadAccess: () => Access
   botUsername: string
   label: string
+  onDeactivate?: () => void
 }): SessionManager {
-  const { stateDir, startPolling, stopPolling, sendNotification, loadAccess, botUsername, label } = opts
+  const { stateDir, startPolling, stopPolling, sendNotification, loadAccess, botUsername, label, onDeactivate } = opts
   const lockPath = join(stateDir, 'sessions.lock')
 
   let sessionId: string = ''
@@ -229,6 +230,7 @@ export function createSessionManager(opts: {
             startPolling()
           } else {
             await stopPolling()
+            onDeactivate?.()
           }
         }
         wasActive = nowActive
@@ -246,15 +248,21 @@ export function createSessionManager(opts: {
         watchInterval = null
       }
 
-      // Remove session entry and pidfile synchronously. The process is
-      // about to exit (cleanup → process.exit), so peers will detect us
-      // as dead via isSessionAlive() even if this runs slightly before
-      // bot.stop() finishes. No async .finally() needed — the process
-      // exit itself is what releases the getUpdates slot.
+      // Remove pidfile BEFORE the session entry. Peers use isSessionAlive()
+      // which checks the pidfile — once it's gone, they see us as dead and
+      // won't conflict with our still-open getUpdates slot. This is safe
+      // because stop() is called during process exit: the TCP connection
+      // will be force-closed momentarily, releasing the Telegram slot.
+      //
+      // Order matters: pidfile first (makes isSessionAlive return false),
+      // then session entry (allows peer promotion), then fire-and-forget
+      // stopPolling (best-effort graceful close before process exit).
+      removePidfile(stateDir)
+
       lockedOp((state) => {
         delete state.sessions[sessionId]
       })
-      removePidfile(stateDir)
+
       stopPolling().catch(() => {})
 
       // Clean up cache file
@@ -299,7 +307,16 @@ export function createSessionManager(opts: {
         }
       })
 
-      if (!targetFound) return false // target disappeared between checks
+      if (!targetFound) {
+        // Target disappeared between the existence check and the locked
+        // mutation. If we already stopped polling, restart it — we're
+        // still the active session in shared state.
+        if (opts?.immediate && !wasActive) {
+          wasActive = true
+          startPolling()
+        }
+        return false
+      }
 
       // Signal the target process to wake up and start polling immediately.
       // Safe to do without delay because bot.stop() already completed above.
