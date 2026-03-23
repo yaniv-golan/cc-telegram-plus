@@ -4,6 +4,7 @@ import type { Deps } from './types.ts'
 import { assertAllowedChat, assertSendable } from './gate.ts'
 import { chunk } from './chunk.ts'
 import { parseMediaToken, downloadMedia } from './media.ts'
+import { scrub } from './scrub.ts'
 
 type ToolResult = { content: { type: string; text: string }[] }
 
@@ -96,11 +97,19 @@ async function handleReply(args: Record<string, any>, deps: Deps): Promise<ToolR
     }
   }
 
-  // 5. Chunk text
+  // 5. Scrub secrets then chunk text
+  let safeText = text
+  if (text) {
+    const { text: scrubbed, redacted } = scrub(text)
+    if (redacted > 0) {
+      process.stderr.write(`telegram channel: scrubbed ${redacted} secret(s) from outbound reply\n`)
+    }
+    safeText = scrubbed
+  }
   const effectiveParseMode = parse_mode
   const chunkLimit = access.textChunkLimit ?? 4096
   const chunkMode = access.chunkMode ?? 'length'
-  const chunks = text ? chunk(text, chunkLimit, chunkMode) : []
+  const chunks = safeText ? chunk(safeText, chunkLimit, chunkMode) : []
 
   // 6. Auto-threading
   let replyToMsgId: number | undefined
@@ -262,6 +271,16 @@ async function handleEditMessage(args: Record<string, any>, deps: Deps): Promise
     return err(e.message)
   }
 
+  // Scrub secrets before sending edit
+  let safeText = text
+  if (text) {
+    const { text: scrubbed, redacted } = scrub(text)
+    if (redacted > 0) {
+      process.stderr.write(`telegram channel: scrubbed ${redacted} secret(s) from outbound edit\n`)
+    }
+    safeText = scrubbed
+  }
+
   const opts: any = {}
   if (parse_mode) {
     opts.parse_mode = parse_mode
@@ -271,14 +290,14 @@ async function handleEditMessage(args: Record<string, any>, deps: Deps): Promise
   }
 
   try {
-    await deps.bot.api.editMessageText(chat_id, parseInt(message_id), text, opts)
+    await deps.bot.api.editMessageText(chat_id, parseInt(message_id), safeText, opts)
     return ok('Message edited')
   } catch (e: any) {
     // Parse error fallback
     if (opts.parse_mode && (e.error_code === 400 || (e.message && e.message.includes("can't parse")))) {
       delete opts.parse_mode
       try {
-        await deps.bot.api.editMessageText(chat_id, parseInt(message_id), text, opts)
+        await deps.bot.api.editMessageText(chat_id, parseInt(message_id), safeText, opts)
         return ok('Message edited (without parse_mode)')
       } catch (e2: any) {
         return err(e2.message)

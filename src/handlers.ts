@@ -6,6 +6,58 @@ export function safeName(s: string | undefined): string | undefined {
   return s?.replace(/[<>\[\]\r\n;]/g, '_')
 }
 
+// ─── Media group buffering ────────────────────────────────────────────────
+// Telegram sends each photo in an album as a separate update with the same
+// media_group_id. We buffer them for 1 second, then deliver as one notification.
+
+type BufferedMedia = {
+  ctx: any
+  content: string
+  mediaToken: string
+}
+
+const mediaGroupBuffer = new Map<string, { items: BufferedMedia[]; timer: ReturnType<typeof setTimeout> }>()
+
+function bufferOrDeliver(
+  ctx: any,
+  content: string,
+  mediaToken: string,
+  deps: Deps,
+): void {
+  const groupId = ctx.message?.media_group_id
+  if (!groupId) {
+    // No album — deliver immediately
+    handleInbound(ctx, content, mediaToken, deps)
+    return
+  }
+
+  const existing = mediaGroupBuffer.get(groupId)
+  if (existing) {
+    existing.items.push({ ctx, content, mediaToken })
+    clearTimeout(existing.timer)
+  } else {
+    mediaGroupBuffer.set(groupId, { items: [{ ctx, content, mediaToken }], timer: null as any })
+  }
+
+  const entry = mediaGroupBuffer.get(groupId)!
+  entry.timer = setTimeout(() => {
+    mediaGroupBuffer.delete(groupId)
+    const items = entry.items
+    if (items.length === 1) {
+      handleInbound(items[0].ctx, items[0].content, items[0].mediaToken, deps)
+      return
+    }
+    // Combine: use first item's ctx for metadata, list all media tokens
+    const captions = items.map(i => i.content).filter(c => c && !c.startsWith('(')).join(', ')
+    const tokens = items.map(i => i.mediaToken)
+    const combinedContent = `[Album: ${items.length} items]${captions ? ' ' + captions : ''}`
+    // Deliver with first token; additional tokens listed in content for Claude to fetch
+    const tokenList = tokens.join(', ')
+    const fullContent = `${combinedContent}\nMedia tokens: ${tokenList}`
+    handleInbound(items[0].ctx, fullContent, tokens[0], deps)
+  }, 1000)
+}
+
 export function registerHandlers(deps: Deps): void {
   const { bot, mcp, cache, sessions } = deps
 
@@ -47,21 +99,21 @@ export function registerHandlers(deps: Deps): void {
     const best = photos[photos.length - 1]
     const content = ctx.message.caption || '(photo)'
     const mediaToken = `photo:${best.file_id}:${best.file_unique_id}`
-    await handleInbound(ctx, content, mediaToken, deps)
+    bufferOrDeliver(ctx, content, mediaToken, deps)
   })
 
   bot.on('message:document', async (ctx) => {
     const doc = ctx.message.document
     const content = ctx.message.caption || safeName(doc.file_name) || '(document)'
     const mediaToken = `document:${doc.file_id}:${doc.file_unique_id}`
-    await handleInbound(ctx, content, mediaToken, deps)
+    bufferOrDeliver(ctx, content, mediaToken, deps)
   })
 
   bot.on('message:video', async (ctx) => {
     const video = ctx.message.video
     const content = ctx.message.caption || '(video)'
     const mediaToken = `video:${video.file_id}:${video.file_unique_id}`
-    await handleInbound(ctx, content, mediaToken, deps)
+    bufferOrDeliver(ctx, content, mediaToken, deps)
   })
 
   bot.on('message:voice', async (ctx) => {
@@ -304,7 +356,7 @@ async function handleInbound(
 
   await bot.api.sendChatAction(String(ctx.chat.id), 'typing').catch(() => {})
 
-  const replyPrefix = extractReplyContext(ctx)
+  const replyPrefix = extractReplyContext(ctx, cache)
   const fullContent = replyPrefix ? replyPrefix + content : content
 
   const meta = buildMeta(ctx)
@@ -345,15 +397,48 @@ function runGate(ctx: any, deps: Deps) {
   })
 }
 
-function extractReplyContext(ctx: any): string | null {
+function extractReplyContext(ctx: any, cache?: { get(chatId: string, msgId: string): string | undefined }): string | null {
   const reply = ctx.message?.reply_to_message
   if (!reply) return null
 
-  const text = reply.text ?? reply.caption ?? ''
-  if (!text) return null
+  const chatId = String(ctx.chat?.id ?? '')
 
-  const truncated = text.length > 200 ? text.slice(0, 200) + '...' : text
-  return `[Replying to: "${truncated}"]\n`
+  // Walk the reply chain up to 3 levels
+  const chain: string[] = []
+  const maxLevels = 3
+  const perLevelCap = 200
+
+  let current = reply
+  for (let i = 0; i < maxLevels && current; i++) {
+    const text = current.text ?? current.caption ?? ''
+    if (text) {
+      const truncated = text.length > perLevelCap ? text.slice(0, perLevelCap) + '...' : text
+      chain.push(truncated)
+    }
+
+    // Try to walk up: Telegram only includes reply_to_message for the direct parent.
+    // For deeper levels, fall back to the cache.
+    const parentReply = current.reply_to_message
+    if (parentReply) {
+      current = parentReply
+    } else if (cache && current.reply_to_message_id) {
+      // reply_to_message_id exists but the full message wasn't included — check cache
+      const cached = cache.get(chatId, String(current.reply_to_message_id))
+      if (cached) {
+        chain.push(cached.length > perLevelCap ? cached.slice(0, perLevelCap) + '...' : cached)
+      }
+      break // can't walk further without data
+    } else {
+      break
+    }
+  }
+
+  if (chain.length === 0) return null
+  if (chain.length === 1) return `[Replying to: "${chain[0]}"]\n`
+
+  // Multi-level: show thread context newest→oldest
+  const threadParts = chain.map(c => `"${c}"`).join(' \u2192 ')
+  return `[Thread: ${threadParts}]\n`
 }
 
 function relativeAge(isoDate: string): string {

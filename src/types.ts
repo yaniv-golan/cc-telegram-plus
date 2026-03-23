@@ -12,6 +12,7 @@ export type Access = {
   replyToMode?: 'off' | 'first' | 'all'
   textChunkLimit?: number
   chunkMode?: 'length' | 'newline'
+  activityLevel?: 0 | 1 | 2
 }
 
 export type GroupPolicy = {

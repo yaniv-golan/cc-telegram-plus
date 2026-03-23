@@ -31,6 +31,10 @@ A community-maintained Telegram channel plugin for Claude Code that extends the 
 | See what Claude is doing | ✘ | ✔ live tool progress |
 | Approve permissions from phone | ✘ | ✔ Allow/Deny buttons |
 | Answer prompts from phone | ✘ terminal only | ✔ AskUserQuestion → Telegram |
+| Secrets redacted in replies | ✘ | ✔ API keys, tokens, PEM keys scrubbed |
+| Photo albums grouped | ✘ each photo separate | ✔ buffered into single notification |
+| Activity verbosity control | ✘ | ✔ silent / standard / verbose |
+| Deep reply-chain context | ✘ | ✔ walks up to 3 levels |
 
 ## Requirements
 
@@ -183,6 +187,7 @@ plugin — your config transfers if you switch between plugins.
 | `replyToMode` | `"off"` | Threading for Claude's replies: `"off"` = no threading, `"first"` = first chunk threads under your message, `"all"` = all chunks thread |
 | `textChunkLimit` | `4096` | Max characters per message before splitting (Telegram's hard limit is 4096) |
 | `chunkMode` | `"length"` | How to split long replies: `"length"` = hard character cut, `"newline"` = prefer paragraph boundaries |
+| `activityLevel` | `1` | Tool activity visibility: `0` = silent (no activity messages), `1` = standard (progress shown, deleted on completion), `2` = verbose (fuller detail, persistent per-tool summary on completion) |
 | `mentionPatterns` | *(none)* | Array of regex patterns that trigger the bot in groups, beyond @botname (e.g. `["hey claude", "cc:"]`) |
 
 Example:

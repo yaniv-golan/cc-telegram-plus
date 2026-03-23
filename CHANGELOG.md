@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.4.0] — 2026-03-23
+
+### Added
+- **Secret scrubbing.** Outbound messages are scanned for known secret
+  patterns (API keys, AWS credentials, GitHub tokens, Slack tokens, PEM
+  private keys, Bearer tokens, Telegram bot tokens) and redacted before
+  reaching Telegram. Defense-in-depth — catches secrets Claude doesn't
+  notice in log output or config snippets. New module: `src/scrub.ts`.
+- **Media group buffering.** Photo albums sent from Telegram are now
+  delivered as a single notification (`[Album: N items]` with all media
+  tokens) instead of N separate messages. Uses a 1-second buffer keyed
+  by `media_group_id`.
+- **Activity levels.** New `activityLevel` field in `access.json`:
+  - `0` — silent: no activity indicators in Telegram
+  - `1` — standard (default): tool names shown, deleted on completion
+  - `2` — verbose: fuller tool detail, persistent per-tool summary on
+    completion (e.g. `✅ Read ×3, Bash ×2 (4.1s)`)
+- **Reply-chain walking.** Reply context now walks up to 3 levels of
+  the reply chain (using Telegram's `reply_to_message` + message cache),
+  formatted as `[Thread: "msg1" → "msg2" → "msg3"]`. Previously only
+  the immediate parent was shown.
+- **Environment variable scrubbing.** `TELEGRAM_BOT_TOKEN` and
+  `OPENAI_API_KEY` are deleted from `process.env` after loading to
+  prevent leakage if Claude runs `printenv`.
+
+### Fixed
+- **Permission relay: session switch orphans.** Permission prompts
+  created by one session are now cleaned up when the user switches to
+  another session. Previously, tapping buttons after a switch showed
+  "Already resolved" even though the request was never answered.
+- **Permission relay: fast-tap race.** Pending entries are now inserted
+  before messages are sent, so a fast button tap no longer returns
+  "Already resolved" during the send window.
+- **Permission relay: retry on failure.** If the MCP notification fails,
+  the pending entry is re-inserted with a 30-second TTL so the user can
+  tap again. Toast changed from "respond in terminal" to "tap again to
+  retry".
+- **Graceful shutdown.** `stop()` now removes the pidfile before the
+  session entry so peers see us as dead via `isSessionAlive()` before
+  they can self-promote. SIGINT/SIGTERM handlers now call `process.exit(0)`
+  after cleanup — previously the process stayed alive in a half-dead state.
+- **Switch recovery.** If `switchTo()` stops polling but the target
+  session vanishes, the current session restarts its own poller instead
+  of leaving a dead window until the watcher notices.
+- **Session label derivation.** Project name now derived from
+  `CLAUDE_PROJECT_DIR` / `cwd()` instead of `OLDPWD` (which is the
+  shell's *previous* directory, not the current one).
+
 ## [0.3.0] — 2026-03-22
 
 ### Added
